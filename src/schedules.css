@@ -1,0 +1,217 @@
+.template-row {
+  grid-template-columns: minmax(0, 1fr) 48px 56px;
+}
+
+.log-template,
+.schedule-template {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font-weight: 750;
+}
+
+.schedule-template {
+  display: grid;
+  place-items: center;
+}
+
+.schedule-template svg {
+  width: 21px;
+}
+
+.schedule-dialog {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+
+.schedule-dialog .schedule-fields {
+  display: grid;
+  grid-template-columns: 1fr 112px;
+  gap: 10px;
+  justify-content: stretch;
+}
+
+.schedule-dialog .schedule-fields input {
+  margin-bottom: 12px;
+}
+
+.schedule-dialog fieldset {
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+}
+
+.schedule-dialog legend {
+  margin-bottom: 8px;
+  color: #bdc4c9;
+  font-size: 12px;
+}
+
+.weekday-picker {
+  display: grid !important;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px !important;
+  justify-content: stretch !important;
+}
+
+.weekday-picker button {
+  min-width: 0 !important;
+  min-height: 44px;
+  border: 1px solid var(--line) !important;
+  border-radius: 9px !important;
+  background: var(--surface) !important;
+  color: var(--muted);
+}
+
+.weekday-picker button.selected {
+  border-color: var(--blue) !important;
+  background: #132635 !important;
+  color: var(--blue);
+}
+
+.schedule-dialog .schedule-preview {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  align-items: center;
+  justify-content: stretch;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid #29422b;
+  border-radius: 10px;
+  background: #111a14;
+}
+
+.schedule-preview svg {
+  width: 24px;
+  color: var(--accent);
+}
+
+.schedule-preview strong,
+.schedule-preview small,
+.replace-days strong,
+.replace-days small {
+  display: block;
+}
+
+.schedule-preview small,
+.replace-days small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.schedule-dialog .replace-days {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  align-items: center;
+  margin-bottom: 18px;
+  color: var(--text);
+}
+
+.schedule-dialog .replace-days input {
+  width: 22px;
+  height: 22px;
+  margin: 0;
+}
+
+.schedule-dialog .dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.schedule-dialog .dialog-actions button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+}
+
+.schedule-dialog .dialog-actions .primary {
+  padding: 0 14px;
+  background: var(--accent);
+  color: #0c1208;
+}
+
+.schedule-dialog .dialog-actions button:disabled {
+  opacity: .45;
+}
+
+@media (max-width: 370px) {
+  .schedule-dialog .schedule-fields { grid-template-columns: 1fr; }
+}
+
+.schedule-manager-link {
+  width: calc(100% - 24px);
+  min-height: 64px;
+  margin: 10px 12px 4px;
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: 30px 1fr 24px;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+}
+
+.schedule-manager-link > svg:first-child { width: 22px; color: var(--accent); }
+.schedule-manager-link > svg:last-child { width: 18px; color: var(--muted); }
+.schedule-manager-link strong,.schedule-manager-link small { display: block; }
+.schedule-manager-link small { margin-top: 4px; color: var(--muted); font-size: 10px; }
+.schedule-manager { max-height: calc(100dvh - 32px); overflow-y: auto; }
+.scheduled-plan-list { display: block !important; margin: 14px -20px; border-top: 1px solid var(--line); }
+.scheduled-plan-list article { min-height: 88px; padding: 10px 12px 10px 18px; display: grid; grid-template-columns: 1fr 52px 58px; gap: 4px; align-items: center; border-bottom: 1px solid var(--line); }
+.scheduled-plan-list strong,.scheduled-plan-list small { display: block; }
+.scheduled-plan-list small { margin-top: 4px; color: var(--muted); font-size: 9px; line-height: 1.35; }
+.scheduled-plan-list button { min-width: 48px !important; min-height: 44px; padding: 0 5px; border: 0; background: transparent; color: var(--blue); font-weight: 700; }
+.scheduled-plan-list .cancel-plan { color: #ff9299; }
+.schedule-empty { display: grid !important; justify-items: center !important; gap: 8px !important; padding: 32px 10px; color: var(--muted); text-align: center; }
+.schedule-empty svg { width: 36px; color: var(--accent); }
+.schedule-empty strong { color: var(--text); }
+.schedule-empty small { font-size: 10px; }
+.cancel-plan-confirm { display: grid !important; justify-content: stretch !important; gap: 7px !important; margin: 12px 0; padding: 12px; border: 1px solid #66343a; border-radius: 10px; background: #1b1113; }
+.cancel-plan-confirm small { color: var(--muted); font-size: 10px; }
+.cancel-plan-confirm button { width: 100%; min-height: 44px; border: 1px solid var(--line) !important; border-radius: 9px !important; background: var(--surface) !important; }
+.cancel-plan-confirm .danger-text { color: #ff9299; border-color: #66343a !important; }
+
+.month-grid button.scheduled { position: relative; }
+.month-grid button.scheduled::after { content: ""; position: absolute; top: 4px; right: 5px; width: 6px; height: 6px; border: 2px solid var(--blue); border-radius: 2px; }
+.month-grid button.scheduled.selected::after { border-color: #071018; }
+.month-grid button.schedule-skip::after { content: "×"; top: 0; right: 3px; width: 12px; height: 14px; border: 0; color: #ff9299; font-size: 14px; font-weight: 900; line-height: 14px; }
+.month-grid button.schedule-substitute::after { top: 5px; right: 6px; width: 7px; height: 7px; border: 0; border-radius: 1px; background: #c59bff; transform: rotate(45deg); }
+.month-grid button.schedule-conflict::after { border-color: #e8ba58; border-radius: 50%; }
+.month-grid button.selected.schedule-skip::after { color: #571016; }
+.month-grid button.selected.schedule-substitute::after { background: #321951; }
+.month-grid button.selected.schedule-conflict::after { border-color: #5c3b00; }
+.scheduled-day-label { min-height: 48px; padding: 7px 14px; display: grid; grid-template-columns: 27px 1fr; gap: 8px; align-items: center; border-bottom: 1px solid var(--line); background: #101b23; }
+.scheduled-day-label svg { width: 20px; color: var(--blue); }
+.scheduled-day-label strong,.scheduled-day-label small { display: block; }
+.scheduled-day-label strong { font-size: 11px; }
+.scheduled-day-label small { margin-top: 2px; color: var(--muted); font-size: 10px; }
+.scheduled-day-label.skip { background: #211214; }
+.scheduled-day-label.skip svg { color: #ff9299; }
+.scheduled-day-label.template { background: #1b1525; }
+.scheduled-day-label.template svg { color: #c59bff; }
+.scheduled-day-label.conflict { background: #1b1810; }
+.scheduled-day-label.conflict svg { color: #e8ba58; }
+.schedule-conflicts { margin: -4px 0 14px; padding: 10px 12px; border: 1px solid #574a2b; border-radius: 9px; background: #1b1810; color: #d7cda9; font-size: 10px; line-height: 1.45; }
+.schedule-conflicts strong { display: block; margin-bottom: 2px; color: #f0e6bd; font-size: 11px; }
+
+.schedule-exceptions { margin-bottom: 16px !important; }
+.schedule-exceptions legend { margin-bottom: 3px; }
+.exception-help { display: block; margin-bottom: 9px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+.exception-row { display: grid !important; grid-template-columns: 118px 1fr 44px; gap: 6px !important; align-items: center; justify-content: stretch !important; margin-bottom: 7px; }
+.schedule-dialog .exception-row input,.schedule-dialog .exception-row select { width: 100%; height: 44px; margin: 0; padding: 0 7px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 11px; }
+.exception-row button { min-width: 44px !important; min-height: 44px; display: grid; place-items: center; border: 0 !important; background: transparent !important; color: #ff9299; }
+.exception-row button svg { width: 18px; }
+.schedule-dialog .add-exception { min-height: 44px; display: flex; align-items: center; gap: 6px; border: 0; background: transparent; color: var(--blue); font-weight: 700; }
+.add-exception svg { width: 18px; }
+.add-exception:disabled { opacity: .4; }
+@media(max-width:370px){.exception-row{grid-template-columns:1fr 44px}.exception-row select{grid-column:1}.exception-row button{grid-column:2;grid-row:1 / 3}}

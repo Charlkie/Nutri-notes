@@ -1,0 +1,4 @@
+/* Adjacent-month dates remain visually muted while meeting text contrast. */
+.month-grid button.outside {
+  opacity: .58;
+}

@@ -1,0 +1,359 @@
+.selected-food > span {
+  min-width: 0;
+}
+
+.selected-food strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.replace-food {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--blue);
+  display: flex;
+  font-size: 12px;
+  font-weight: 750;
+  gap: 6px;
+  justify-content: center;
+  margin-left: auto;
+  min-height: 44px;
+  min-width: 88px;
+}
+
+.replace-food svg {
+  width: 17px;
+}
+
+.edit-toolbar {
+  grid-template-columns: repeat(4, 1fr);
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.edit-toolbar button:not(:disabled):nth-child(2),
+.edit-toolbar button:not(:disabled):nth-child(3) {
+  color: var(--blue);
+}
+
+.edit-toolbar button:disabled {
+  opacity: 0.35;
+}
+
+.entry-transfer-trigger {
+  position: fixed;
+  right: max(10px, calc((100vw - 600px) / 2 + 10px));
+  top: calc(var(--safe-top) + 5px);
+  z-index: 10;
+}
+
+.transfer-dialog > p strong {
+  color: var(--text);
+}
+
+.transfer-dialog > div button {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.transfer-dialog > div button svg {
+  width: 17px;
+}
+
+.category-management {
+  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  margin: 2px 0 18px;
+  padding: 14px 0;
+}
+
+.category-management > div {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.category-management > div button,
+.category-delete {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  min-height: 44px;
+}
+
+.category-management button:disabled {
+  opacity: 0.35;
+}
+
+.category-management button svg {
+  width: 17px;
+}
+
+.category-management label {
+  display: block;
+  margin-top: 12px;
+}
+
+.category-management select {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--text);
+  display: block;
+  height: 44px;
+  margin-top: 7px;
+  padding: 0 9px;
+  width: 100%;
+}
+
+.category-management .category-delete {
+  color: var(--danger);
+  margin-top: 10px;
+  width: 100%;
+}
+
+.recipe-entry-error {
+  margin: 10px 14px;
+}
+
+.inline-food-action {
+  align-items: center;
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--blue);
+  display: flex;
+  font-weight: 700;
+  gap: 7px;
+  justify-content: center;
+  margin: 8px 12px 14px;
+  min-height: 46px;
+  width: calc(100% - 24px);
+}
+
+.inline-food-action svg {
+  width: 18px;
+}
+
+.inline-food-dialog select {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--text);
+  display: block;
+  height: 48px;
+  margin-top: 7px;
+  padding: 0 8px;
+  width: 100%;
+}
+
+.inline-food-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.inline-food-dialog > .inline-food-grid {
+  justify-content: initial;
+}
+
+.inline-food-dialog > .inline-food-grid label {
+  min-width: 0;
+}
+
+.recipe-log-dialog input {
+  font-size: 20px;
+  font-weight: 750;
+  text-align: center;
+}
+
+.add-instance-ingredient {
+  align-items: center;
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--blue);
+  display: flex;
+  font-weight: 750;
+  gap: 7px;
+  justify-content: center;
+  margin: 12px 14px;
+  min-height: 48px;
+  width: calc(100% - 28px);
+}
+
+.add-instance-ingredient svg,
+.inline-create svg {
+  width: 19px;
+}
+
+.instance-add-dialog .dialog-search {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.instance-add-dialog .dialog-search svg {
+  color: var(--muted);
+  width: 20px;
+}
+
+.instance-add-dialog .dialog-search input {
+  margin: 0;
+}
+
+.instance-add-dialog > .instance-food-results {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  display: block;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.instance-food-results > button {
+  align-items: center;
+  background: var(--surface);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: 1fr 30px;
+  min-height: 58px;
+  padding: 7px 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.instance-food-results > button:last-child {
+  border-bottom: 0;
+}
+
+.instance-food-results strong,
+.instance-food-results small {
+  display: block;
+}
+
+.instance-food-results small {
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 4px;
+}
+
+.instance-food-results svg {
+  color: var(--blue);
+  width: 19px;
+}
+
+.instance-add-dialog .inline-create {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--blue);
+  display: flex;
+  gap: 7px;
+  justify-content: center;
+  margin-top: 8px;
+  min-height: 44px;
+  width: 100%;
+}
+
+.logged-servings {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: 11px;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.logged-servings input {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 750;
+  height: 42px;
+  text-align: center;
+  width: 92px;
+}
+
+.instance-ingredients > div {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: 34px 1fr 105px 42px;
+  min-height: 66px;
+  padding: 7px 8px 7px 12px;
+}
+
+.instance-ingredients > div.disabled {
+  opacity: 0.45;
+}
+
+.instance-ingredients > div > input {
+  accent-color: var(--accent);
+  height: 24px;
+  width: 24px;
+}
+
+.instance-remove {
+  background: transparent;
+  border: 0;
+  color: var(--danger);
+  height: 44px;
+}
+
+.instance-remove svg {
+  width: 18px;
+}
+
+.recipe-save-dialog > .save-choice {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: block;
+  margin-bottom: 8px;
+  min-height: 58px;
+  padding: 8px 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.recipe-save-dialog > .save-choice.primary {
+  background: var(--accent);
+  color: #10150b;
+}
+
+.recipe-save-dialog .save-choice strong,
+.recipe-save-dialog .save-choice small {
+  display: block;
+}
+
+.recipe-save-dialog .save-choice small {
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 3px;
+}
+
+.recipe-save-dialog .save-choice.primary small {
+  color: #26321a;
+}
+
+@media(max-width: 374px) {
+  .instance-ingredients > div {
+    grid-template-columns: 30px 1fr 88px 38px;
+    padding-left: 8px;
+    padding-right: 4px;
+  }
+}

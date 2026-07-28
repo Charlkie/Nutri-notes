@@ -1,0 +1,19 @@
+import ReactDOM from "react-dom/client";
+import { registerSW } from "virtual:pwa-register";
+import App from "./App";
+import "./styles.css";
+import "./milestone.css";
+import "./calendar.css";
+import "./body.css";
+import "./charts.css";
+import "./settings.css";
+import "./preferences.css";
+import "./hardening.css";
+import "./recipes.css";
+import "./recipeImport.css";
+import "./importFood.css";
+import "./schedules.css";
+import "./accessibility.css";
+
+registerSW({ immediate: true });
+ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
