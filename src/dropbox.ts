@@ -11,6 +11,30 @@ const OAUTH_KEY = "nutri-notes.dropbox.oauth";
 const AUTO_BACKUP_DELAY = 8_000;
 const AUTO_BACKUP_THROTTLE = 60_000;
 
+export async function dropboxApiError(
+  response: Response,
+  fallback: string,
+): Promise<Error> {
+  const body = (await response.text()).trim();
+  let detail = body;
+  try {
+    const parsed = JSON.parse(body) as {
+      error_summary?: string;
+      error_description?: string;
+      error?: { ".tag"?: string } | string;
+    };
+    detail =
+      parsed.error_summary ??
+      parsed.error_description ??
+      (typeof parsed.error === "string" ? parsed.error : parsed.error?.[".tag"]) ??
+      body;
+  } catch {
+    // Dropbox also returns useful plain-text diagnostics for malformed requests.
+  }
+  const suffix = detail ? `: ${detail.slice(0, 240)}` : "";
+  return new Error(`${fallback} (${response.status})${suffix}`);
+}
+
 interface StoredDropboxAuth {
   refreshToken: string;
   accessToken?: string;
@@ -116,7 +140,7 @@ async function tokenRequest(parameters: Record<string, string>) {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ client_id: DROPBOX_APP_KEY, ...parameters }),
   });
-  if (!response.ok) throw new Error(`Dropbox authorization failed (${response.status})`);
+  if (!response.ok) throw await dropboxApiError(response, "Dropbox authorization failed");
   return (await response.json()) as {
     access_token: string;
     expires_in: number;
@@ -180,7 +204,7 @@ async function fetchAccount() {
     "https://api.dropboxapi.com/2/users/get_current_account",
     { method: "POST", headers: { Authorization: `Bearer ${await accessToken()}` } },
   );
-  if (!response.ok) throw new Error(`Could not read Dropbox account (${response.status})`);
+  if (!response.ok) throw await dropboxApiError(response, "Could not read Dropbox account");
   const account = (await response.json()) as {
     name?: { display_name?: string };
     email?: string;
@@ -207,9 +231,9 @@ async function uploadFile(path: string, contents: string) {
         mute: true,
       }),
     },
-    body: contents,
+    body: new Blob([contents], { type: "application/octet-stream" }),
   });
-  if (!response.ok) throw new Error(`Dropbox backup upload failed (${response.status})`);
+  if (!response.ok) throw await dropboxApiError(response, "Dropbox backup upload failed");
 }
 
 async function uploadBackup() {
@@ -234,7 +258,7 @@ async function downloadLatest() {
   });
   if (!response.ok) {
     if (response.status === 409) throw new Error("No Dropbox backup exists yet");
-    throw new Error(`Dropbox restore failed (${response.status})`);
+    throw await dropboxApiError(response, "Dropbox restore failed");
   }
   return parseBackup(JSON.parse(await response.text()));
 }
