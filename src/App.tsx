@@ -140,6 +140,10 @@ import {
   useDropboxBackup,
   type DropboxBackupController,
 } from "./dropbox";
+import {
+  useGoogleDriveBackup,
+  type GoogleDriveBackupController,
+} from "./googleDrive";
 import type {
   AppSettings,
   DayFoodEntry,
@@ -205,6 +209,7 @@ export default function App() {
   const [toast, setToast] = useState<Toast>();
   const [dbError, setDbError] = useState<string>();
   const dropbox = useDropboxBackup();
+  const googleDrive = useGoogleDriveBackup(route === "settings");
   const date = isoDate(selectedDate);
   const data = useDay(date);
   const categories =
@@ -431,6 +436,7 @@ export default function App() {
           categories={categories}
           settings={appSettings}
           dropbox={dropbox}
+          googleDrive={googleDrive}
           onToast={setToast}
         />
       )}
@@ -3251,11 +3257,13 @@ function SettingsScreen({
   categories,
   settings,
   dropbox,
+  googleDrive,
   onToast,
 }: {
   categories: FoodCategory[];
   settings: AppSettings;
   dropbox: DropboxBackupController;
+  googleDrive: GoogleDriveBackupController;
   onToast: (toast: Toast) => void;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
@@ -3346,6 +3354,18 @@ function SettingsScreen({
       });
     }
   };
+  const restoreGoogleDrive = async () => {
+    try {
+      const backup = await googleDrive.restoreLatest();
+      setPending(backup);
+      setImportName("Google Drive · nutri-notes-latest.json");
+    } catch (ex) {
+      onToast({
+        message:
+          ex instanceof Error ? ex.message : "Google Drive restore failed",
+      });
+    }
+  };
   return (
     <main className="screen settings-screen">
       <header className="brand-bar">
@@ -3394,11 +3414,11 @@ function SettingsScreen({
           <strong>Private by design</strong>
           <p>
             No required account or analytics. Data stays local unless you
-            optionally connect your own Dropbox for automatic backups.
+            optionally connect your own cloud storage for automatic backups.
           </p>
         </div>
       </section>
-      <section className="settings-group dropbox-settings">
+      <section className="settings-group cloud-backup-settings">
         <header>
           <Cloud />
           <span>
@@ -3412,7 +3432,7 @@ function SettingsScreen({
         </header>
         {dropbox.connected ? (
           <>
-            <div className="dropbox-status" role="status">
+            <div className="cloud-backup-status" role="status">
               <span className={dropbox.lastError ? "error" : "ready"}>
                 {dropbox.busy
                   ? "Backing up…"
@@ -3497,6 +3517,169 @@ function SettingsScreen({
             <span>
               <strong>Connect your Dropbox</strong>
               <small>Authorise Nutri Notes to use only its App Folder.</small>
+            </span>
+            <ChevronRight />
+          </button>
+        )}
+      </section>
+      <section className="settings-group cloud-backup-settings">
+        <header>
+          <Cloud />
+          <span>
+            <strong>Automatic Google Drive backup</strong>
+            <small>
+              {googleDrive.connected
+                ? googleDrive.needsReconnect
+                  ? "Reconnect to resume queued backups."
+                  : `Connected${googleDrive.accountName ? ` as ${googleDrive.accountName}` : ""}.`
+                : "Optional · stored in your private Drive App Data Folder."}
+            </small>
+          </span>
+        </header>
+        {googleDrive.connected ? (
+          <>
+            <div className="cloud-backup-status" role="status">
+              <span
+                className={
+                  googleDrive.lastError || googleDrive.needsReconnect
+                    ? "error"
+                    : "ready"
+                }
+              >
+                {googleDrive.busy
+                  ? "Backing up…"
+                  : googleDrive.needsReconnect
+                    ? "Reconnect required"
+                    : googleDrive.lastError
+                      ? "Backup needs attention"
+                      : "Automatic backup is on"}
+              </span>
+              <small>
+                {googleDrive.lastError
+                  ? googleDrive.lastError
+                  : googleDrive.lastBackupAt
+                    ? `Last backup ${format(new Date(googleDrive.lastBackupAt), "d MMM, h:mm a")}`
+                    : "The first backup will run after connecting."}
+              </small>
+              {googleDrive.accountEmail && (
+                <small>{googleDrive.accountEmail}</small>
+              )}
+            </div>
+            {googleDrive.needsReconnect ? (
+              <button
+                disabled={
+                  googleDrive.busy ||
+                  !googleDrive.ready ||
+                  !navigator.onLine
+                }
+                onClick={async () => {
+                  try {
+                    await googleDrive.connect();
+                    onToast({ message: "Google Drive reconnected" });
+                  } catch (ex) {
+                    onToast({
+                      message:
+                        ex instanceof Error
+                          ? ex.message
+                          : "Google Drive reconnection failed",
+                    });
+                  }
+                }}
+              >
+                <CloudUpload />
+                <span>
+                  <strong>Reconnect Google Drive</strong>
+                  <small>Resume queued automatic backups.</small>
+                </span>
+                <ChevronRight />
+              </button>
+            ) : (
+              <button
+                disabled={googleDrive.busy || !navigator.onLine}
+                onClick={async () => {
+                  try {
+                    await googleDrive.backupNow();
+                    onToast({ message: "Google Drive backup finished" });
+                  } catch (ex) {
+                    onToast({
+                      message:
+                        ex instanceof Error
+                          ? ex.message
+                          : "Google Drive backup failed",
+                    });
+                  }
+                }}
+              >
+                <CloudUpload />
+                <span>
+                  <strong>Back up now</strong>
+                  <small>Update today’s file and the latest backup.</small>
+                </span>
+                <ChevronRight />
+              </button>
+            )}
+            <button
+              disabled={
+                googleDrive.busy ||
+                googleDrive.needsReconnect ||
+                !navigator.onLine
+              }
+              onClick={() => void restoreGoogleDrive()}
+            >
+              <CloudDownload />
+              <span>
+                <strong>Restore from Google Drive</strong>
+                <small>Review before merging or replacing local data.</small>
+              </span>
+              <ChevronRight />
+            </button>
+            <button
+              className="cloud-disconnect"
+              disabled={googleDrive.busy}
+              onClick={async () => {
+                await googleDrive.disconnect();
+                onToast({
+                  message: "Google Drive disconnected · local data kept",
+                });
+              }}
+            >
+              <Unlink />
+              <span>
+                <strong>Disconnect Google Drive</strong>
+                <small>Cloud files and local nutrition data are kept.</small>
+              </span>
+              <ChevronRight />
+            </button>
+          </>
+        ) : (
+          <button
+            disabled={
+              googleDrive.busy || !googleDrive.ready || !navigator.onLine
+            }
+            onClick={async () => {
+              try {
+                await googleDrive.connect();
+                onToast({ message: "Google Drive connected" });
+              } catch (ex) {
+                onToast({
+                  message:
+                    ex instanceof Error
+                      ? ex.message
+                      : "Google Drive connection could not start",
+                });
+              }
+            }}
+          >
+            <CloudUpload />
+            <span>
+              <strong>
+                {googleDrive.ready
+                  ? "Connect your Google Drive"
+                  : "Loading Google connection…"}
+              </strong>
+              <small>
+                Authorise only the hidden Nutri Notes app-data folder.
+              </small>
             </span>
             <ChevronRight />
           </button>

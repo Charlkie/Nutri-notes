@@ -1,35 +1,36 @@
-.dropbox-status {
+.cloud-backup-status {
   background: #0f1518;
   border-bottom: 1px solid var(--line);
   padding: 12px 14px;
 }
 
-.dropbox-status span,
-.dropbox-status small {
+.cloud-backup-status span,
+.cloud-backup-status small {
   display: block;
 }
 
-.dropbox-status span {
+.cloud-backup-status span {
   font-size: 13px;
   font-weight: 750;
 }
 
-.dropbox-status .ready {
+.cloud-backup-status .ready {
   color: var(--accent);
 }
 
-.dropbox-status .error {
+.cloud-backup-status .error {
   color: var(--danger);
 }
 
-.dropbox-status small {
+.cloud-backup-status small {
   margin-top: 5px;
 }
 
-.dropbox-settings > button:disabled {
+.cloud-backup-settings > button:disabled {
   opacity: .45;
 }
 
-.dropbox-settings > button.dropbox-disconnect > svg:first-child {
+.cloud-backup-settings > button.dropbox-disconnect > svg:first-child,
+.cloud-backup-settings > button.cloud-disconnect > svg:first-child {
   color: var(--danger);
 }

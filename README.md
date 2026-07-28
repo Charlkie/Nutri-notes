@@ -83,6 +83,7 @@ Recipes use the same boundary. Saved recipes reference current foods and define 
 - Validated versioned JSON backup/restore and spreadsheet-compatible CSV exports
 - Native share-sheet backups for saving JSON to Files, iCloud Drive, Google Drive, Dropbox, AirDrop, or another compatible app, with a direct-download fallback
 - Optional per-user Dropbox App Folder connection with PKCE, debounced automatic backups, offline retry, dated versions, manual backup, reviewed restore, status reporting, and token revocation on disconnect
+- Optional per-user Google Drive App Data Folder connection with queued automatic backups while authorised, dated versions, manual backup, reviewed restore, clear token-renewal state, and consent revocation on disconnect
 - Persisted appearance, accent, targets, week-start, copy behavior and editable food categories
 - Entry replacement that preserves order, consumed state and notes, plus accessible move-up/down controls
 - Individual entry move/copy between dates with independent snapshots and non-blocking undo
@@ -153,6 +154,15 @@ debounced upload while it is open and online. It maintains
 queued backup retries on the next app launch or network reconnection. iOS does
 not guarantee PWA execution while the app is fully closed, so uploads are not
 described as closed-app background sync.
+
+Google Drive uses the non-sensitive `drive.appdata` scope and Google Identity
+Services' browser token model. Files are hidden in each user's Drive App Data
+Folder and cannot be accessed by other Drive applications. Google browser
+tokens are intentionally short-lived and do not include refresh tokens; after
+expiration the UI requests a user-driven reconnection, then immediately uploads
+the persistent queue. This avoids introducing a token-holding backend or
+embedding a client secret. Google tokens are stored only in that browser and
+are excluded from Nutri Notes JSON backups.
 
 ## Preferences milestone
 
