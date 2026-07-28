@@ -1,0 +1,39 @@
+.food-import-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 0 12px 10px;
+}
+.food-import-actions button {
+  min-height: 62px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+  padding: 9px;
+  color: var(--text);
+}
+.food-import-actions svg { width: 22px; color: var(--blue); flex: 0 0 auto; }
+.food-import-actions span { display: grid; gap: 2px; }
+.food-import-actions strong { font-size: 12px; }
+.food-import-actions small { font-size: 9px; color: var(--muted); }
+.camera-frame { position: relative; }
+.camera-guide {
+  position: absolute;
+  inset: 35px 24px;
+  border: 2px solid color-mix(in srgb, var(--accent) 75%, transparent);
+  border-radius: 16px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px;
+  color: white;
+  background: linear-gradient(transparent 65%, #0009);
+  pointer-events: none;
+  font-size: 12px;
+}
+.camera-guide svg { width: 18px; }

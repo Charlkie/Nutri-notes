@@ -40,7 +40,10 @@ export default defineConfig({
           { src: "icons/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "maskable" },
         ],
       },
-      workbox: { globPatterns: ["**/*.{js,css,html,svg,woff2}"] },
+      workbox: {
+        globPatterns: ["**/*.{js,css,html,svg,woff2,json}"],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+      },
     }),
   ],
 });

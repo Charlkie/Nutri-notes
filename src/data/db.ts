@@ -6,6 +6,7 @@ import type {
   DayLog,
   DietTemplate,
   Food,
+  CatalogFood,
   FoodCategory,
   ID,
   ISODate,
@@ -38,6 +39,7 @@ import { buildLoggedRecipe, recipeSnapshot } from "../domain/recipes";
 
 export class NutritionDB extends Dexie {
   foods!: EntityTable<Food, "id">;
+  catalogFoods!: EntityTable<CatalogFood, "id">;
   categories!: EntityTable<FoodCategory, "id">;
   days!: EntityTable<DayLog, "id">;
   entries!: EntityTable<DayFoodEntry, "id">;
@@ -188,6 +190,18 @@ export class NutritionDB extends Dexie {
             })),
           );
       });
+    this.version(10).stores({
+      foods: "id, name, categoryId, lastLoggedAt, logCount, updatedAt, barcode",
+      catalogFoods: "id, name, categoryId, barcode, source.externalId",
+      categories: "id, sortIndex",
+      days: "id, &date, updatedAt, scheduleId",
+      entries: "id, dayId, [dayId+sortIndex], consumed",
+      templates: "id, name, updatedAt",
+      schedules: "id, templateId, start, updatedAt",
+      recipes: "id, name, categoryId, updatedAt",
+      weights: "id, date",
+      settings: "key",
+    });
     this.on("populate", async () => {
       await this.categories.bulkAdd(seedCategories);
       await this.foods.bulkAdd(seedFoods);
@@ -198,6 +212,21 @@ export class NutritionDB extends Dexie {
 }
 
 export const db = new NutritionDB();
+let catalogLoad: Promise<void> | undefined;
+export function ensureFoodCatalog(): Promise<void> {
+  catalogLoad ??= (async () => {
+    if (await db.catalogFoods.count()) return;
+    const url = new URL("./catalog/fsanz-ausnut-2023.json", document.baseURI);
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("The bundled FSANZ catalogue could not be opened");
+    const foods = (await response.json()) as CatalogFood[];
+    await db.catalogFoods.bulkPut(foods);
+  })();
+  return catalogLoad.catch((error) => {
+    catalogLoad = undefined;
+    throw error;
+  });
+}
 export const id = createId;
 export const isoDate = (date: Date): ISODate =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -229,6 +258,7 @@ export async function addFoodToDay(
       updatedAt: now,
     };
     await db.entries.add(entry);
+    if (food.id.startsWith("catalog:")) await db.foods.put(food);
     await db.foods.update(food.id, {
       logCount: food.logCount + 1,
       lastLoggedAt: now,
@@ -246,6 +276,7 @@ export async function replaceFoodEntry(
     if (!entry) throw new Error("Food entry no longer exists");
     const now = new Date().toISOString();
     await db.entries.put(replaceEntryFood(entry, food, quantity, now));
+    if (food.id.startsWith("catalog:")) await db.foods.put(food);
     await db.foods.update(food.id, {
       logCount: food.logCount + 1,
       lastLoggedAt: now,

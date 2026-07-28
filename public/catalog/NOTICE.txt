@@ -1,0 +1,20 @@
+Australian food catalogue attribution
+=====================================
+
+This directory contains a transformed subset of AUSNUT 2023 from Food
+Standards Australia New Zealand (FSANZ): food identity, classification,
+derivation, household measures, and energy/protein/carbohydrate/fat/fibre
+values.
+
+Source: https://www.foodstandards.gov.au/science-data/food-nutrient-databases/ausnut/data-files
+Dataset: AUSNUT 2023
+Attribution: © Food Standards Australia New Zealand
+
+The source database and this transformed database are distributed under the
+FSANZ Data User Licence Agreement, based on Creative Commons
+Attribution-ShareAlike 3.0 Australia. This notice applies to the transformed
+catalogue data and does not change the licence of the surrounding application
+code.
+
+Nutrition values are reference data, not individual nutritional or medical
+advice. Derivation metadata is retained in each catalogue record.

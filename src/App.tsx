@@ -48,6 +48,7 @@ import {
   Download,
   FileJson,
   FileSpreadsheet,
+  ImagePlus,
   FolderOpen,
   GripVertical,
   Info,
@@ -63,6 +64,7 @@ import {
   Save,
   Scale,
   Search,
+  ScanBarcode,
   Settings,
   Share2,
   ShieldCheck,
@@ -87,6 +89,7 @@ import {
   db,
   deleteCategory,
   id,
+  ensureFoodCatalog,
   importFullBackup,
   isoDate,
   reorderCategory,
@@ -163,11 +166,15 @@ const RecipePanel = lazy(() =>
 const RecipeEntryEditor = lazy(() =>
   import("./recipes").then((module) => ({ default: module.RecipeEntryEditor })),
 );
+const FoodImportTools = lazy(() =>
+  import("./foodImport").then((module) => ({ default: module.FoodImportTools })),
+);
 type PickerTab = "foods" | "recipes" | "templates";
 type Route =
   | PrimaryRoute
   | "picker"
   | "foodForm"
+  | "foodImport"
   | "entryForm"
   | "recipeEntry"
   | "templateEditor";
@@ -219,6 +226,7 @@ export default function App() {
   useEffect(() => {
     db.open()
       .then(() => seedDemoDay())
+      .then(() => ensureFoodCatalog().catch(() => setToast({ message: "FSANZ catalogue is temporarily unavailable · saved foods still work" })))
       .catch((e) =>
         setDbError(e instanceof Error ? e.message : "Database unavailable"),
       );
@@ -320,6 +328,7 @@ export default function App() {
             setEditingFood(undefined);
             setRoute("foodForm");
           }}
+          onImport={() => setRoute("foodImport")}
           onEditFood={(food) => {
             setEditingFood(food);
             setRoute("foodForm");
@@ -337,6 +346,19 @@ export default function App() {
             goDay();
           }}
         />
+      )}
+      {route === "foodImport" && (
+        <Suspense fallback={<div className="loading">Opening food importer…</div>}>
+          <FoodImportTools
+            categories={categories}
+            onClose={() => setRoute("picker")}
+            onSaved={(food) => {
+              setEditingFood(food);
+              setToast({ message: `${food.name} saved after review` });
+              setRoute("entryForm");
+            }}
+          />
+        </Suspense>
       )}
       {route === "templateEditor" && editingTemplate && (
         <TemplateEditor
@@ -442,6 +464,7 @@ export default function App() {
       )}
       {route !== "picker" &&
         route !== "foodForm" &&
+        route !== "foodImport" &&
         route !== "entryForm" &&
         route !== "recipeEntry" &&
         route !== "templateEditor" && <BottomNav active={route} onNav={nav} />}
@@ -924,6 +947,7 @@ function FoodPicker({
   replacing = false,
   onClose,
   onCustom,
+  onImport,
   onEditFood,
   onSelected,
   onEditTemplate,
@@ -936,6 +960,7 @@ function FoodPicker({
   replacing?: boolean;
   onClose: () => void;
   onCustom: () => void;
+  onImport: () => void;
   onEditFood: (f: Food) => void;
   onSelected: (f: Food) => void;
   onEditTemplate: (t: DietTemplate) => void;
@@ -947,6 +972,7 @@ function FoodPicker({
   const [editingSchedule, setEditingSchedule] = useState<TemplateSchedule>();
   const [showSchedules, setShowSchedules] = useState(false);
   const foods = useLiveQuery(() => db.foods.toArray(), []) ?? [];
+  const catalogFoods = useLiveQuery(() => db.catalogFoods.toArray(), []) ?? [];
   const templates =
     useLiveQuery(
       () => db.templates.orderBy("updatedAt").reverse().toArray(),
@@ -959,7 +985,12 @@ function FoodPicker({
     ) ?? [];
   const visible = useMemo(
     () =>
-      foods
+      [
+        ...foods,
+        ...(query.trim().length >= 2
+          ? catalogFoods.filter((catalog) => !foods.some((food) => food.source?.externalId === catalog.source.externalId))
+          : []),
+      ]
         .filter(
           (f) =>
             (!category || f.categoryId === category) &&
@@ -973,7 +1004,7 @@ function FoodPicker({
             b.logCount - a.logCount ||
             a.name.localeCompare(b.name),
         ),
-    [foods, category, query, categories],
+    [foods, catalogFoods, category, query, categories],
   );
   const usage = (food: Food) =>
     food.logCount
@@ -1142,9 +1173,13 @@ function FoodPicker({
               </button>
             ))}
           </div>
+          {!replacing && <div className="food-import-actions" aria-label="Add food from another source">
+            <button onClick={onImport}><ScanBarcode/><span><strong>Scan or search</strong><small>Barcode · branded food</small></span></button>
+            <button onClick={onImport}><ImagePlus/><span><strong>Import label</strong><small>Photo · manual review</small></span></button>
+          </div>}
           <div className="picker-meta">
             <span>{visible.length} foods</span>
-            <span>Recent · frequent · A–Z</span>
+            <span>{query.trim().length < 2 ? "Type 2+ letters to search FSANZ" : "Local · FSANZ · A–Z"}</span>
           </div>
           <section className="food-list">
             {visible.map((food) => {
@@ -1160,7 +1195,9 @@ function FoodPicker({
                       <strong>{food.name}</strong>
                       <small>
                         {food.brand && `${food.brand} · `}
-                        {usage(food)}
+                        {food.source?.kind === "fsanz"
+                          ? `FSANZ ${food.source.datasetVersion} · ${food.source.derivation ?? "reference data"}`
+                          : usage(food)}
                       </small>
                     </span>
                     <b>
@@ -1173,7 +1210,7 @@ function FoodPicker({
                   <button
                     className="info-button"
                     onClick={() => onEditFood(food)}
-                    aria-label={`Edit ${food.name}`}
+                    aria-label={`${food.source?.kind === "fsanz" ? "Review and copy" : "Edit"} ${food.name}`}
                   >
                     <Info />
                   </button>
@@ -1871,8 +1908,9 @@ function FoodForm({
         throw new Error("Base quantity must be greater than zero");
       if (values.fibre !== "") assertNonNegative(Number(values.fibre), "Fibre");
       const now = new Date().toISOString();
+      const officialCopy = food?.source?.kind === "fsanz";
       const next: Food = {
-        id: food?.id ?? id(),
+        id: officialCopy ? id() : (food?.id ?? id()),
         name: values.name.trim(),
         brand: values.brand.trim() || undefined,
         categoryId: values.categoryId,
@@ -1886,6 +1924,19 @@ function FoodForm({
         fibre: values.fibre === "" ? undefined : Number(values.fibre),
         servingDescription: values.servingDescription.trim() || undefined,
         notes: values.notes.trim() || undefined,
+        barcode: food?.barcode,
+        measures: food?.measures,
+        source: officialCopy
+          ? {
+              kind: "custom",
+              provider: `User customised from ${food!.source!.provider}`,
+              datasetVersion: food!.source!.datasetVersion,
+              derivation: food!.source!.derivation,
+              importedAt: now,
+              sourceUrl: food!.source!.sourceUrl,
+              reviewedAt: now,
+            }
+          : food?.source ? { ...food.source, reviewedAt: now } : undefined,
         logCount: food?.logCount ?? 0,
         lastLoggedAt: food?.lastLoggedAt,
         createdAt: food?.createdAt ?? now,
@@ -2129,6 +2180,24 @@ function EntryForm({
             {error}
           </p>
         )}
+        {food?.measures?.length ? (
+          <Field label="Common Australian measure">
+            <select
+              defaultValue=""
+              onChange={(event) => {
+                const measure = food.measures?.find((item) => item.id === event.target.value);
+                if (measure) setQuantity(String(measure.grams));
+              }}
+            >
+              <option value="">Choose a measure…</option>
+              {food.measures.map((measure) => (
+                <option key={measure.id} value={measure.id}>
+                  {measure.label} · {Math.round(measure.grams * 10) / 10} g
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
         <Field
           label={
             food?.calculationMode === "perServing"

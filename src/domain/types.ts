@@ -10,6 +10,24 @@ export interface Nutrients {
   fat: number;
   fibre?: number;
 }
+export type FoodSourceKind = "custom" | "seed" | "fsanz" | "open-food-facts" | "nutrition-label";
+export interface FoodSource {
+  kind: FoodSourceKind;
+  provider: string;
+  externalId?: string;
+  datasetVersion?: string;
+  derivation?: string;
+  importedAt: string;
+  sourceUrl?: string;
+  reviewedAt?: string;
+}
+export interface FoodMeasure {
+  id: string;
+  label: string;
+  quantity: number;
+  grams: number;
+  millilitres?: number;
+}
 export interface Food extends Nutrients {
   id: ID;
   name: string;
@@ -20,10 +38,16 @@ export interface Food extends Nutrients {
   baseUnit: FoodUnit;
   servingDescription?: string;
   notes?: string;
+  barcode?: string;
+  source?: FoodSource;
+  measures?: FoodMeasure[];
   logCount: number;
   lastLoggedAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+export interface CatalogFood extends Food {
+  source: FoodSource;
 }
 export interface FoodSnapshot extends Nutrients {
   foodId?: ID;

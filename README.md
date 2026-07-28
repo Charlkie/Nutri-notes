@@ -71,6 +71,11 @@ Recipes use the same boundary. Saved recipes reference current foods and define 
 - Date paging, Today/Yesterday labels, empty-day actions, and independent previous-day copying
 - Dense ordered food cards, completion controls, live planned/consumed totals, and macro summary
 - Local food search, category filters, usage metadata, custom food creation and saved-food editing
+- Offline FSANZ AUSNUT 2023 catalogue search with 3,741 Australian foods, source/derivation metadata and useful source-derived household measures
+- Optional Open Food Facts branded search and barcode lookup with community-source labelling
+- Camera barcode capture using native detection or the bundled open-source ZXing fallback, with manual barcode entry as a final fallback
+- Nutrition-label photo intake, on-device text detection where available, iPhone Live Text/manual fallback, and parsed Australian nutrition panels
+- Mandatory review confirmation before barcode, branded, or label-derived nutrition is saved
 - Per-serving and per-100-g/mL nutrition, entry quantity editing, deletion, and non-blocking undo
 - Eight editable seed foods and nine colour-coded categories
 - Loading, validation, empty-result, deferred-feature, and database-error states
@@ -113,7 +118,30 @@ Recipes use the same boundary. Saved recipes reference current foods and define 
 ## Intentionally deferred
 
 - Multi-serving cards, day overflow actions, swipe navigation, and component-level route tests
-- URL recipe fetching and automatic nutrition lookup
+- URL recipe fetching
+
+## Australian food data and imports
+
+The bundled reference catalogue is a transformed subset of **AUSNUT 2023**
+published by Food Standards Australia New Zealand. It is loaded into a separate
+IndexedDB table and is not duplicated into cloud/JSON backups; selecting an
+official food materialises only that record into the editable local food
+library. Official records retain their FSANZ public food key, dataset version,
+derivation and source URL. Editing one creates a clearly identified custom copy
+so modified values are not misrepresented as official FSANZ values.
+
+The transformed catalogue is attributed and distributed under the FSANZ Data
+User Licence Agreement based on CC BY-SA 3.0 Australia; see
+`public/catalog/NOTICE.txt`. Branded results come from Open Food Facts and are
+explicitly marked as community-contributed; Open Food Facts database content is
+available under the Open Database Licence (ODbL). Branded lookup is optional network
+use; saved foods, FSANZ search and ordinary logging remain offline.
+
+Label photos remain in browser memory and are not persisted or uploaded by
+Nutri Notes. Native on-device text detection is used when available. Browsers
+without it can use iPhone Live Text to paste the panel text before the same
+manual review step. Camera frames are not retained; only an explicitly submitted
+barcode is sent to the branded-food provider.
 
 ## Template and ordering milestone
 
