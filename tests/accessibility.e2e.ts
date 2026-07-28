@@ -56,7 +56,7 @@ test("FSANZ search and label imports require review before saving", async ({ pag
 });
 
 test("energy unit toggle updates and persists", async ({ page }) => {
-  await page.goto("/#screen=day&date=2026-07-28");
+  await page.goto("/#screen=day&date=2026-07-27");
   const kcal = page.getByRole("button", { name: /Energy shown in kilocalories/i });
   await expect(kcal).toBeVisible();
   await kcal.click();
