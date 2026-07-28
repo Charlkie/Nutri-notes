@@ -81,6 +81,7 @@ Recipes use the same boundary. Saved recipes reference current foods and define 
 - Local body-weight logging with notes, editing, undoable deletion, trends and seven-day averages
 - Local analytics with category/macro breakdowns, nutrition and weight trends, date filters and food rankings
 - Validated versioned JSON backup/restore and spreadsheet-compatible CSV exports
+- Native share-sheet backups for saving JSON to Files, iCloud Drive, Google Drive, Dropbox, AirDrop, or another compatible app, with a direct-download fallback
 - Persisted appearance, accent, targets, week-start, copy behavior and editable food categories
 - Entry replacement that preserves order, consumed state and notes, plus accessible move-up/down controls
 - Individual entry move/copy between dates with independent snapshots and non-blocking undo
@@ -131,6 +132,13 @@ The Charts tab calculates analytics on demand from immutable day snapshots and w
 ## Data-portability milestone
 
 Settings provides a versioned, validated full JSON backup containing foods, recipes, categories, templates, day logs, ordered snapshots and body weight. Imports support merge or replace; replace first downloads the current database. Separate UTF-8 CSV exports cover day totals, food entries and weight history, with CRLF rows, spreadsheet-safe text and numeric values left numeric.
+
+On compatible HTTPS browsers, **Share or save backup** passes the JSON file to
+the operating system share sheet. This lets iPhone users save into Files,
+iCloud Drive, Google Drive, Dropbox, AirDrop, or another installed share target
+without granting Nutri Notes access to a cloud account. Unsupported browsers
+fall back to a normal JSON download, and the dedicated download action remains
+available separately.
 
 ## Preferences milestone
 

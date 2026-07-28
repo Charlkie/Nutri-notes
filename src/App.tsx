@@ -61,6 +61,7 @@ import {
   Scale,
   Search,
   Settings,
+  Share2,
   ShieldCheck,
   Tags,
   Target,
@@ -3253,12 +3254,43 @@ function SettingsScreen({
   >();
   const exportBackup = async (prefix?: string) => {
     const backup = await createFullBackup();
+    const filename = backupFilename(prefix);
+    const text = JSON.stringify(backup, null, 2);
     downloadText(
-      backupFilename(prefix),
-      JSON.stringify(backup, null, 2),
+      filename,
+      text,
       "application/json",
     );
     return backup;
+  };
+  const shareBackup = async () => {
+    const backup = await createFullBackup();
+    const filename = backupFilename();
+    const text = JSON.stringify(backup, null, 2);
+    const file = new File([text], filename, { type: "application/json" });
+    const shareData = { files: [file], title: "Nutri Notes backup" };
+    let fileSharingSupported = typeof navigator.share === "function";
+
+    if (fileSharingSupported && typeof navigator.canShare === "function") {
+      try {
+        fileSharingSupported = navigator.canShare({ files: [file] });
+      } catch {
+        fileSharingSupported = false;
+      }
+    }
+
+    if (fileSharingSupported) {
+      try {
+        await navigator.share(shareData);
+        onToast({ message: "Backup shared" });
+        return;
+      } catch (ex) {
+        if (ex instanceof DOMException && ex.name === "AbortError") return;
+      }
+    }
+
+    downloadText(filename, text, "application/json");
+    onToast({ message: "Sharing unavailable · backup downloaded" });
   };
   const csvExport = async (name: keyof ReturnType<typeof createCsvExports>) => {
     const backup = await createFullBackup();
@@ -3355,6 +3387,16 @@ function SettingsScreen({
           </span>
         </header>
         <button
+          onClick={() => void shareBackup()}
+        >
+          <Share2 />
+          <span>
+            <strong>Share or save backup</strong>
+            <small>Choose Files, iCloud Drive, Google Drive or Dropbox.</small>
+          </span>
+          <ChevronRight />
+        </button>
+        <button
           onClick={async () => {
             await exportBackup();
             onToast({ message: "Full backup downloaded" });
@@ -3362,8 +3404,8 @@ function SettingsScreen({
         >
           <FileJson />
           <span>
-            <strong>Export JSON backup</strong>
-            <small>Use this to restore all app data.</small>
+            <strong>Download JSON backup</strong>
+            <small>Save directly through the browser.</small>
           </span>
           <Download />
         </button>
