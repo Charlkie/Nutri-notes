@@ -1,0 +1,31 @@
+.recipe-edit {
+  grid-template-columns: minmax(0, 1fr) 44px;
+  padding-right: 2px;
+  overflow: hidden;
+}
+
+.recipe-edit > span {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.recipe-edit strong,
+.recipe-edit small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recipe-edit svg {
+  width: 18px;
+  height: 18px;
+  justify-self: center;
+  flex: 0 0 auto;
+}
+
+.recipe-fields input,
+.recipe-fields select,
+.recipe-notes textarea {
+  font-size: 16px;
+}

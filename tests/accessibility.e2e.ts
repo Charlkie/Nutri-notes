@@ -31,6 +31,10 @@ test("food and recipe picker has labelled, accessible controls", async ({ page }
   await page.getByRole("button", { name: "Recipes", exact: true }).click();
   await page.getByRole("button", { name: "Log", exact: true }).first().waitFor();
   await expectNoSeriousViolations(page);
+  await page.getByRole("button", { name: /Beef Rice Bowl/i }).click();
+  const recipeName = page.getByLabel("Recipe name");
+  await expect(recipeName).not.toBeFocused();
+  await expect(recipeName).toHaveCSS("font-size", "16px");
 });
 
 test("FSANZ search and label imports require review before saving", async ({ page }) => {
