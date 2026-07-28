@@ -11,6 +11,10 @@ test("primary screens have no serious automated accessibility violations", async
   for (const screen of ["day", "body", "calendar", "charts", "settings"] as const) {
     await page.goto(`/#screen=${screen}&date=2026-07-27`);
     await page.locator("main").waitFor();
+    if (screen === "settings")
+      await expect(
+        page.getByRole("button", { name: /Connect your Dropbox/i }),
+      ).toBeVisible();
     await expectNoSeriousViolations(page);
   }
 });

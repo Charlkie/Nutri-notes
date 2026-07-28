@@ -82,6 +82,7 @@ Recipes use the same boundary. Saved recipes reference current foods and define 
 - Local analytics with category/macro breakdowns, nutrition and weight trends, date filters and food rankings
 - Validated versioned JSON backup/restore and spreadsheet-compatible CSV exports
 - Native share-sheet backups for saving JSON to Files, iCloud Drive, Google Drive, Dropbox, AirDrop, or another compatible app, with a direct-download fallback
+- Optional per-user Dropbox App Folder connection with PKCE, debounced automatic backups, offline retry, dated versions, manual backup, reviewed restore, status reporting, and token revocation on disconnect
 - Persisted appearance, accent, targets, week-start, copy behavior and editable food categories
 - Entry replacement that preserves order, consumed state and notes, plus accessible move-up/down controls
 - Individual entry move/copy between dates with independent snapshots and non-blocking undo
@@ -139,6 +140,19 @@ iCloud Drive, Google Drive, Dropbox, AirDrop, or another installed share target
 without granting Nutri Notes access to a cloud account. Unsupported browsers
 fall back to a normal JSON download, and the dedicated download action remains
 available separately.
+
+Users can also optionally connect their own Dropbox account. Nutri Notes uses
+OAuth code flow with PKCE and the public Dropbox App key; no app secret or
+Dropbox password is stored by the PWA. Dropbox grants access only to the Nutri
+Notes App Folder in that user's account. The refresh token remains in that
+browser's local storage and is intentionally excluded from exported backups.
+
+After a database mutation, the app records a persistent dirty flag and queues a
+debounced upload while it is open and online. It maintains
+`nutri-notes-latest.json` plus one overwritten snapshot per calendar date. A
+queued backup retries on the next app launch or network reconnection. iOS does
+not guarantee PWA execution while the app is fully closed, so uploads are not
+described as closed-app background sync.
 
 ## Preferences milestone
 

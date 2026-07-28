@@ -14,6 +14,7 @@ import "./recipeImport.css";
 import "./importFood.css";
 import "./schedules.css";
 import "./accessibility.css";
+import "./dropbox.css";
 
 registerSW({ immediate: true });
 ReactDOM.createRoot(document.getElementById("root")!).render(<App />);

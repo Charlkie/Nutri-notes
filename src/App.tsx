@@ -40,6 +40,9 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleHelp,
+  Cloud,
+  CloudDownload,
+  CloudUpload,
   Copy,
   Database,
   Download,
@@ -70,6 +73,7 @@ import {
   Upload,
   UserRound,
   Utensils,
+  Unlink,
   X,
 } from "lucide-react";
 import {
@@ -132,6 +136,10 @@ import {
   parseNavigationHash,
   type PrimaryRoute,
 } from "./domain/navigation";
+import {
+  useDropboxBackup,
+  type DropboxBackupController,
+} from "./dropbox";
 import type {
   AppSettings,
   DayFoodEntry,
@@ -196,6 +204,7 @@ export default function App() {
   const [editingTemplate, setEditingTemplate] = useState<DietTemplate>();
   const [toast, setToast] = useState<Toast>();
   const [dbError, setDbError] = useState<string>();
+  const dropbox = useDropboxBackup();
   const date = isoDate(selectedDate);
   const data = useDay(date);
   const categories =
@@ -421,6 +430,7 @@ export default function App() {
         <SettingsScreen
           categories={categories}
           settings={appSettings}
+          dropbox={dropbox}
           onToast={setToast}
         />
       )}
@@ -3240,10 +3250,12 @@ function backupFilename(prefix = "nutri-notes-backup") {
 function SettingsScreen({
   categories,
   settings,
+  dropbox,
   onToast,
 }: {
   categories: FoodCategory[];
   settings: AppSettings;
+  dropbox: DropboxBackupController;
   onToast: (toast: Toast) => void;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
@@ -3323,6 +3335,17 @@ function SettingsScreen({
       onToast({ message: ex instanceof Error ? ex.message : "Import failed" });
     }
   };
+  const restoreDropbox = async () => {
+    try {
+      const backup = await dropbox.restoreLatest();
+      setPending(backup);
+      setImportName("Dropbox · nutri-notes-latest.json");
+    } catch (ex) {
+      onToast({
+        message: ex instanceof Error ? ex.message : "Dropbox restore failed",
+      });
+    }
+  };
   return (
     <main className="screen settings-screen">
       <header className="brand-bar">
@@ -3370,10 +3393,114 @@ function SettingsScreen({
         <div>
           <strong>Private by design</strong>
           <p>
-            No account, cloud sync, analytics, or background uploads. Exported
-            files leave the device only when you choose.
+            No required account or analytics. Data stays local unless you
+            optionally connect your own Dropbox for automatic backups.
           </p>
         </div>
+      </section>
+      <section className="settings-group dropbox-settings">
+        <header>
+          <Cloud />
+          <span>
+            <strong>Automatic Dropbox backup</strong>
+            <small>
+              {dropbox.connected
+                ? `Connected${dropbox.accountName ? ` as ${dropbox.accountName}` : ""}.`
+                : "Optional · stored in your private Nutri Notes App Folder."}
+            </small>
+          </span>
+        </header>
+        {dropbox.connected ? (
+          <>
+            <div className="dropbox-status" role="status">
+              <span className={dropbox.lastError ? "error" : "ready"}>
+                {dropbox.busy
+                  ? "Backing up…"
+                  : dropbox.lastError
+                    ? "Backup needs attention"
+                    : "Automatic backup is on"}
+              </span>
+              <small>
+                {dropbox.lastError
+                  ? dropbox.lastError
+                  : dropbox.lastBackupAt
+                    ? `Last backup ${format(new Date(dropbox.lastBackupAt), "d MMM, h:mm a")}`
+                    : "The first backup will run automatically."}
+              </small>
+              {dropbox.accountEmail && <small>{dropbox.accountEmail}</small>}
+            </div>
+            <button
+              disabled={dropbox.busy || !navigator.onLine}
+              onClick={async () => {
+                try {
+                  await dropbox.backupNow();
+                  onToast({ message: "Dropbox backup finished" });
+                } catch (ex) {
+                  onToast({
+                    message:
+                      ex instanceof Error ? ex.message : "Dropbox backup failed",
+                  });
+                }
+              }}
+            >
+              <CloudUpload />
+              <span>
+                <strong>Back up now</strong>
+                <small>Update today’s file and the latest backup.</small>
+              </span>
+              <ChevronRight />
+            </button>
+            <button
+              disabled={dropbox.busy || !navigator.onLine}
+              onClick={() => void restoreDropbox()}
+            >
+              <CloudDownload />
+              <span>
+                <strong>Restore from Dropbox</strong>
+                <small>Review before merging or replacing local data.</small>
+              </span>
+              <ChevronRight />
+            </button>
+            <button
+              className="dropbox-disconnect"
+              disabled={dropbox.busy}
+              onClick={async () => {
+                await dropbox.disconnect();
+                onToast({ message: "Dropbox disconnected · local data kept" });
+              }}
+            >
+              <Unlink />
+              <span>
+                <strong>Disconnect Dropbox</strong>
+                <small>Cloud files and local nutrition data are kept.</small>
+              </span>
+              <ChevronRight />
+            </button>
+          </>
+        ) : (
+          <button
+            disabled={dropbox.busy || !navigator.onLine}
+            onClick={async () => {
+              try {
+                await dropbox.connect();
+              } catch (ex) {
+                onToast({
+                  message:
+                    ex instanceof Error
+                      ? ex.message
+                      : "Dropbox connection could not start",
+                });
+              }
+            }}
+          >
+            <CloudUpload />
+            <span>
+              <strong>Connect your Dropbox</strong>
+              <small>Authorise Nutri Notes to use only its App Folder.</small>
+            </span>
+            <ChevronRight />
+          </button>
+        )}
       </section>
       <section className="settings-group">
         <header>
