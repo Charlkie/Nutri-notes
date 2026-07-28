@@ -70,6 +70,7 @@ Recipes use the same boundary. Saved recipes reference current foods and define 
 - Five-item app shell with Body, Calendar, Food, Charts, and Settings navigation
 - Date paging, Today/Yesterday labels, empty-day actions, and independent previous-day copying
 - Dense ordered food cards, completion controls, live planned/consumed totals, and macro summary
+- One-tap persistent kcal/kJ switching from the daily summary with global energy-display updates, haptic feedback and a reduced-motion-safe border pulse
 - Local food search, category filters, usage metadata, custom food creation and saved-food editing
 - Offline FSANZ AUSNUT 2023 catalogue search with 3,741 Australian foods, source/derivation metadata and useful source-derived household measures
 - Optional Open Food Facts branded search and barcode lookup with community-source labelling

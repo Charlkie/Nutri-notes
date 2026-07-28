@@ -168,12 +168,14 @@ export interface NutritionTargets {
   fat: number;
 }
 export type WeightUnit = "kg" | "lb";
+export type EnergyUnit = "kcal" | "kJ";
 export interface AppSettings {
   appearance: "system" | "light" | "dark";
   accentColour: string;
   weekStartsOn: 0 | 1;
   copyConsumedState: "reset" | "preserve";
   weightUnit: WeightUnit;
+  energyUnit: EnergyUnit;
   targets: NutritionTargets;
 }
 export interface StoredSettings {

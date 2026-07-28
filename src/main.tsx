@@ -14,6 +14,7 @@ import "./recipeImport.css";
 import "./importFood.css";
 import "./foodImport.css";
 import "./foodImportActions.css";
+import "./energy.css";
 import "./schedules.css";
 import "./accessibility.css";
 import "./dropbox.css";

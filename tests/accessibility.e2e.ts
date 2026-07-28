@@ -50,3 +50,14 @@ test("FSANZ search and label imports require review before saving", async ({ pag
   await expect(save).toBeEnabled();
   await expectNoSeriousViolations(page);
 });
+
+test("energy unit toggle updates and persists", async ({ page }) => {
+  await page.goto("/#screen=day&date=2026-07-28");
+  const kcal = page.getByRole("button", { name: /Energy shown in kilocalories/i });
+  await expect(kcal).toBeVisible();
+  await kcal.click();
+  await expect(page.getByRole("button", { name: /Energy shown in kilojoules/i })).toBeVisible();
+  await expect(page.getByText(/kJ/).first()).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("button", { name: /Energy shown in kilojoules/i })).toBeVisible();
+});

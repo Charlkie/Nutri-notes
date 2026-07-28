@@ -202,6 +202,26 @@ export class NutritionDB extends Dexie {
       weights: "id, date",
       settings: "key",
     });
+    this.version(11)
+      .stores({
+        foods: "id, name, categoryId, lastLoggedAt, logCount, updatedAt, barcode",
+        catalogFoods: "id, name, categoryId, barcode, source.externalId",
+        categories: "id, sortIndex",
+        days: "id, &date, updatedAt, scheduleId",
+        entries: "id, dayId, [dayId+sortIndex], consumed",
+        templates: "id, name, updatedAt",
+        schedules: "id, templateId, start, updatedAt",
+        recipes: "id, name, categoryId, updatedAt",
+        weights: "id, date",
+        settings: "key",
+      })
+      .upgrade(async (tx) => {
+        const stored = await tx.table("settings").get("app");
+        await tx.table("settings").put({
+          key: "app",
+          value: { ...defaultSettings, ...stored?.value, energyUnit: stored?.value?.energyUnit ?? "kcal" },
+        });
+      });
     this.on("populate", async () => {
       await this.categories.bulkAdd(seedCategories);
       await this.foods.bulkAdd(seedFoods);

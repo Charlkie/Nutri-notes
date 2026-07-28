@@ -107,7 +107,6 @@ import {
   assertNonNegative,
   calculateNutrients,
   resizeSnapshot,
-  roundCalories,
   roundMacro,
   sumEntries,
 } from "./domain/nutrition";
@@ -133,6 +132,8 @@ import {
 } from "./domain/portability";
 import { defaultSettings } from "./domain/settings";
 import { scheduledTemplateDates } from "./domain/templates";
+import { energyValue } from "./domain/energy";
+import { EnergyDisplayProvider, EnergyText, useEnergyDisplay } from "./energyDisplay";
 import {
   isPrimaryRoute,
   navigationHash,
@@ -280,6 +281,13 @@ export default function App() {
       </main>
     );
   return (
+    <EnergyDisplayProvider
+      unit={appSettings.energyUnit ?? "kcal"}
+      toggle={() => {
+        const energyUnit = (appSettings.energyUnit ?? "kcal") === "kcal" ? "kJ" : "kcal";
+        void saveAppSettings({ ...appSettings, energyUnit });
+      }}
+    >
     <div className="app-shell">
       {route === "day" && (
         <DayScreen
@@ -484,6 +492,7 @@ export default function App() {
         </div>
       )}
     </div>
+    </EnergyDisplayProvider>
   );
 }
 function DayScreen({
@@ -854,7 +863,7 @@ function SortableFoodCard({
               {entry.snapshot.quantity} <em>{entry.snapshot.unit}</em>
             </b>
             <b>
-              {roundCalories(entry.snapshot.calories)} <em>kcal</em>
+              <EnergyText calories={entry.snapshot.calories} />
             </b>
           </span>
           <span className="macros">
@@ -898,11 +907,13 @@ function NutritionSummary({
   totals: ReturnType<typeof sumEntries>;
   targets: AppSettings["targets"];
 }) {
+  const { unit, toggle } = useEnergyDisplay();
+  const [flashing, setFlashing] = useState(false);
   const pct = totals.planned.calories
     ? Math.round((totals.consumed.calories / totals.planned.calories) * 100)
     : 0;
   return (
-    <section className="summary" aria-label="Daily totals">
+    <section className={`summary ${flashing ? "energy-flash" : ""}`} aria-label="Daily totals">
       <div
         className="summary-ring"
         style={
@@ -915,13 +926,28 @@ function NutritionSummary({
       </div>
       <div className="energy">
         <small>
-          CONSUMED / PLANNED · TARGET {roundCalories(targets.calories)}
+          CONSUMED / PLANNED · TARGET <EnergyText calories={targets.calories} />
         </small>
         <strong>
-          {roundCalories(totals.consumed.calories)}{" "}
-          <em>/ {roundCalories(totals.planned.calories)} kcal</em>
+          <EnergyText calories={totals.consumed.calories} />{" "}
+          <em>/ <EnergyText calories={totals.planned.calories} /></em>
         </strong>
       </div>
+      <button
+        className="energy-unit-toggle"
+        type="button"
+        onClick={() => {
+          toggle();
+          navigator.vibrate?.(15);
+          setFlashing(false);
+          requestAnimationFrame(() => setFlashing(true));
+          window.setTimeout(() => setFlashing(false), 520);
+        }}
+        aria-label={`Energy shown in ${unit === "kcal" ? "kilocalories" : "kilojoules"}. Switch to ${unit === "kcal" ? "kilojoules" : "kilocalories"}`}
+      >
+        <b>{unit}</b>
+        <small>tap</small>
+      </button>
       <div className="summary-macros">
         <span>
           <small>PROTEIN · {targets.protein}g</small>
@@ -1104,7 +1130,7 @@ function FoodPicker({
                         <strong>{template.name}</strong>
                         <small>
                           {template.items.length} foods ·{" "}
-                          {roundCalories(calories)} kcal
+                          <EnergyText calories={calories} />
                         </small>
                       </span>
                       <ChevronRight />
@@ -1204,7 +1230,7 @@ function FoodPicker({
                       {food.calculationMode === "per100"
                         ? "100 " + food.baseUnit
                         : (food.servingDescription ?? `1 ${food.baseUnit}`)}
-                      <small>{roundCalories(food.calories)} kcal</small>
+                      <small><EnergyText calories={food.calories} /></small>
                     </b>
                   </button>
                   <button
@@ -1844,7 +1870,7 @@ function SortableTemplateItem({
         <strong>{item.snapshot.name}</strong>
         <small>
           {item.snapshot.quantity} {item.snapshot.unit} ·{" "}
-          {roundCalories(item.snapshot.calories)} kcal
+          <EnergyText calories={item.snapshot.calories} />
         </small>
       </span>
       <button
@@ -2229,7 +2255,7 @@ function EntryForm({
           <div className="preview">
             <span>
               <small>ENERGY</small>
-              <b>{roundCalories(preview.calories)} kcal</b>
+              <b><EnergyText calories={preview.calories} /></b>
             </span>
             <span>
               <small>PROTEIN</small>
@@ -2622,7 +2648,7 @@ function CalendarScreen({
         {selectedEntries.length ? (
           <>
             <div className="history-total">
-              <strong>{roundCalories(totals.planned.calories)} kcal</strong>
+              <strong><EnergyText calories={totals.planned.calories} /></strong>
               <span>
                 P {roundMacro(totals.planned.protein)} · C{" "}
                 {roundMacro(totals.planned.carbohydrates)} · F{" "}
@@ -2646,10 +2672,7 @@ function CalendarScreen({
                         {entry.snapshot.quantity} {entry.snapshot.unit}
                       </small>
                     </span>
-                    <b>
-                      {roundCalories(entry.snapshot.calories)}
-                      <small>kcal</small>
-                    </b>
+                    <b><EnergyText calories={entry.snapshot.calories} /></b>
                     {entry.consumed && <Check aria-label="Consumed" />}
                   </div>
                 ))}
@@ -2951,6 +2974,7 @@ function WeightEditor({
 }
 type ChartPeriod = "all" | "year" | "month" | "week" | "day" | "custom";
 function ChartsScreen({ categories }: { categories: FoodCategory[] }) {
+  const { unit } = useEnergyDisplay();
   const [tab, setTab] = useState<"breakdown" | "trends" | "foods">("breakdown");
   const [period, setPeriod] = useState<ChartPeriod>("all");
   const [customFrom, setCustomFrom] = useState(
@@ -3037,7 +3061,10 @@ function ChartsScreen({ categories }: { categories: FoodCategory[] }) {
           value: point.weightKg,
           average: point.rollingAverageKg,
         }))
-      : days.map((day) => ({ date: day.date, value: day[trend] }));
+      : days.map((day) => ({
+          date: day.date,
+          value: trend === "calories" ? energyValue(day[trend], unit) : day[trend],
+        }));
   return (
     <main className="screen charts-screen">
       <header className="brand-bar">
@@ -3126,10 +3153,7 @@ function ChartsScreen({ categories }: { categories: FoodCategory[] }) {
                 <div className="donut" style={{ background: gradient }}>
                   <div>
                     <strong>{selected?.label}</strong>
-                    <b>
-                      {roundCalories(selected?.value ?? 0)}
-                      <small>kcal</small>
-                    </b>
+                    <b><EnergyText calories={selected?.value ?? 0} /></b>
                     <span>
                       {total
                         ? (((selected?.value ?? 0) / total) * 100).toFixed(1)
@@ -3141,7 +3165,7 @@ function ChartsScreen({ categories }: { categories: FoodCategory[] }) {
               </div>
               <div className="breakdown-total">
                 <span>Total</span>
-                <strong>{roundCalories(total)} kcal</strong>
+                <strong><EnergyText calories={total} /></strong>
               </div>
               <div className="breakdown-list">
                 {breakdown.map((item, index) => (
@@ -3153,7 +3177,7 @@ function ChartsScreen({ categories }: { categories: FoodCategory[] }) {
                     <i style={{ background: colourFor(item, index) }} />
                     <span>{item.label}</span>
                     <b>
-                      {roundCalories(item.value)}
+                      <EnergyText calories={item.value} />
                       <small>
                         {total ? ((item.value / total) * 100).toFixed(1) : 0}%
                       </small>
@@ -3195,7 +3219,7 @@ function ChartsScreen({ categories }: { categories: FoodCategory[] }) {
                     .at(-1)
                     ?.value.toFixed(trend === "calories" ? 0 : 1)}{" "}
                   {trend === "calories"
-                    ? "kcal"
+                    ? unit
                     : trend === "weight"
                       ? "kg"
                       : "g"}
@@ -3231,8 +3255,7 @@ function ChartsScreen({ categories }: { categories: FoodCategory[] }) {
                   </small>
                 </div>
                 <b>
-                  {roundCalories(food.calories)}
-                  <small>kcal</small>
+                  <EnergyText calories={food.calories} />
                   <em>{roundMacro(food.protein)}g P</em>
                 </b>
               </article>
