@@ -7,6 +7,14 @@ async function expectNoSeriousViolations(page: Page) {
   expect(violations, violations.map(({ id, help, nodes }) => `${id}: ${help} (${nodes.length})`).join("\n")).toEqual([]);
 }
 
+async function swipeScreen(page:Page,from:{x:number;y:number},to:{x:number;y:number}){
+  await page.locator("main").evaluate((target,{from,to})=>{
+    const make=(point:{x:number;y:number})=>new Touch({identifier:7,target,clientX:point.x,clientY:point.y,screenX:point.x,screenY:point.y,radiusX:2,radiusY:2,rotationAngle:0,force:0.5});
+    target.dispatchEvent(new TouchEvent("touchstart",{bubbles:true,cancelable:true,touches:[make(from)],targetTouches:[make(from)],changedTouches:[make(from)]}));
+    target.dispatchEvent(new TouchEvent("touchend",{bubbles:true,cancelable:true,touches:[],targetTouches:[],changedTouches:[make(to)]}));
+  },{from,to});
+}
+
 test("primary screens have no serious automated accessibility violations", async ({ page }) => {
   for (const screen of ["day", "body", "calendar", "charts", "settings"] as const) {
     await page.goto(`/#screen=${screen}&date=2026-07-27`);
@@ -20,6 +28,17 @@ test("primary screens have no serious automated accessibility violations", async
       ]);
     await expectNoSeriousViolations(page);
   }
+});
+
+test("horizontal swipes follow primary navigation and preserve edge gestures",async({page})=>{
+  await page.goto("/#screen=body&date=2026-07-27");
+  await expect(page.getByRole("button",{name:"Body",exact:true})).toHaveAttribute("aria-current","page");
+  await swipeScreen(page,{x:330,y:430},{x:80,y:430});
+  await expect(page.getByRole("button",{name:"Calendar",exact:true})).toHaveAttribute("aria-current","page");
+  await swipeScreen(page,{x:80,y:430},{x:330,y:430});
+  await expect(page.getByRole("button",{name:"Body",exact:true})).toHaveAttribute("aria-current","page");
+  await swipeScreen(page,{x:20,y:430},{x:300,y:430});
+  await expect(page.getByRole("button",{name:"Body",exact:true})).toHaveAttribute("aria-current","page");
 });
 
 test("food and recipe picker has labelled, accessible controls", async ({ page }) => {

@@ -2,6 +2,7 @@ import type { ISODate } from "./types";
 
 export const primaryRoutes = ["day", "body", "calendar", "charts", "settings"] as const;
 export type PrimaryRoute = (typeof primaryRoutes)[number];
+export const primarySwipeRoutes:readonly PrimaryRoute[]=["body","calendar","day","charts","settings"];
 
 export interface RestoredNavigation {
   route: PrimaryRoute;
@@ -32,4 +33,10 @@ export function navigationHash(route: PrimaryRoute, date: ISODate): string {
 
 export function isPrimaryRoute(route: string): route is PrimaryRoute {
   return primaryRoutes.includes(route as PrimaryRoute);
+}
+
+export function routeAfterSwipe(route:PrimaryRoute,direction:"left"|"right"):PrimaryRoute{
+  const index=primarySwipeRoutes.indexOf(route);
+  const next=index+(direction==="left"?1:-1);
+  return primarySwipeRoutes[next]??route;
 }

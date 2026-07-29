@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   addDays,
@@ -142,6 +142,7 @@ import {
   isPrimaryRoute,
   navigationHash,
   parseNavigationHash,
+  routeAfterSwipe,
   type PrimaryRoute,
 } from "./domain/navigation";
 import {
@@ -219,6 +220,7 @@ export default function App() {
   const [editingTemplate, setEditingTemplate] = useState<DietTemplate>();
   const [toast, setToast] = useState<Toast>();
   const [dbError, setDbError] = useState<string>();
+  const screenSwipe = useRef<{ x: number; y: number; startedAt: number }>();
   const dropbox = useDropboxBackup();
   const googleDrive = useGoogleDriveBackup(route === "settings");
   const date = isoDate(selectedDate);
@@ -274,6 +276,25 @@ export default function App() {
       setRoute("picker");
     } else setRoute(next);
   };
+  const beginScreenSwipe=(event:TouchEvent<HTMLDivElement>)=>{
+    if(!isPrimaryRoute(route)||event.touches.length!==1)return;
+    const target=event.target as Element;
+    if(target.closest("button, a, input, textarea, select, [role='slider'], [data-no-screen-swipe], .chips, .period-tabs, .trend-metrics"))return;
+    const touch=event.touches[0];
+    if(!touch||touch.clientX<28||touch.clientX>innerWidth-28)return;
+    screenSwipe.current={x:touch.clientX,y:touch.clientY,startedAt:performance.now()};
+  };
+  const finishScreenSwipe=(event:TouchEvent<HTMLDivElement>)=>{
+    const started=screenSwipe.current;
+    screenSwipe.current=undefined;
+    if(!started||!isPrimaryRoute(route))return;
+    const touch=event.changedTouches[0];
+    if(!touch)return;
+    const dx=touch.clientX-started.x;
+    const dy=touch.clientY-started.y;
+    if(Math.abs(dx)<64||Math.abs(dx)<Math.abs(dy)*1.35||performance.now()-started.startedAt>750)return;
+    setRoute(routeAfterSwipe(route,dx<0?"left":"right"));
+  };
   if (dbError)
     return (
       <main className="fatal">
@@ -291,7 +312,7 @@ export default function App() {
         void saveAppSettings({ ...appSettings, energyUnit });
       }}
     >
-    <div className="app-shell">
+    <div className="app-shell" onTouchStart={beginScreenSwipe} onTouchEnd={finishScreenSwipe} onTouchCancel={()=>{screenSwipe.current=undefined}}>
       {route === "day" && (
         <DayScreen
           date={date}

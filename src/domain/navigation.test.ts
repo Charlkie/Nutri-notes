@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isISODate, navigationHash, parseNavigationHash } from "./navigation";
+import { isISODate, navigationHash, parseNavigationHash, routeAfterSwipe } from "./navigation";
 
 describe("restorable navigation", () => {
   it("restores a primary screen and selected date", () => {
@@ -25,4 +25,9 @@ describe("restorable navigation", () => {
     expect(isISODate("2025-02-29")).toBe(false);
     expect(isISODate("27-07-2026")).toBe(false);
   });
+});
+
+describe("primary screen swiping",()=>{
+  it("follows the visible bottom navigation order",()=>{expect(routeAfterSwipe("body","left")).toBe("calendar");expect(routeAfterSwipe("calendar","left")).toBe("day");expect(routeAfterSwipe("day","right")).toBe("calendar")});
+  it("stops at either end",()=>{expect(routeAfterSwipe("body","right")).toBe("body");expect(routeAfterSwipe("settings","left")).toBe("settings")});
 });
