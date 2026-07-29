@@ -106,6 +106,7 @@
   border-radius: 9px;
   color: var(--text);
   display: block;
+  font-size: 16px;
   line-height: 1.4;
   margin-top: 6px;
   min-height: 76px;

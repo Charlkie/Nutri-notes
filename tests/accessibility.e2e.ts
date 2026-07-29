@@ -41,6 +41,7 @@ test("food and recipe picker has labelled, accessible controls", async ({ page }
   await page.getByPlaceholder("Food name, brand or category").fill("Quick oats");
   await page.locator(".recipe-ingredient-picker .food-select").filter({ hasText: "Quick oats" }).click();
   await expect(page.getByRole("spinbutton", { name: "Quantity for Quick oats" })).toBeVisible();
+  await expect(page.getByLabel("Preparation steps")).toHaveCSS("font-size", "16px");
 });
 
 test("FSANZ search and label imports require review before saving", async ({ page }) => {
