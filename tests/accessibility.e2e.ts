@@ -81,12 +81,12 @@ test("custom food energy can be entered in kcal or kJ", async ({ page }) => {
 
   const energy = page.getByRole("spinbutton", { name: "Energy in kilocalories" });
   await energy.fill("100");
-  const units = page.getByRole("group", { name: "Energy unit" });
-  await units.getByRole("button", { name: "kJ", exact: true }).click();
+  const unit = page.getByRole("button", { name: /Energy unit kcal/i });
+  await unit.click();
   const kilojoules = page.getByRole("spinbutton", { name: "Energy in kilojoules" });
   await expect(kilojoules).toHaveValue("418.4");
   await kilojoules.fill("836.8");
-  await units.getByRole("button", { name: "kcal", exact: true }).click();
+  await page.getByRole("button", { name: /Energy unit kJ/i }).click();
   await expect(page.getByRole("spinbutton", { name: "Energy in kilocalories" })).toHaveValue("200");
   await expectNoSeriousViolations(page);
 });

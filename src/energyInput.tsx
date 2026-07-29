@@ -11,8 +11,8 @@ export function EnergyInput({ calories, onCaloriesChange }: {
   const [unit, setUnit] = useState<EnergyUnit>(preferredUnit);
   const [text, setText] = useState(() => calories === undefined ? "" : String(energyInputValue(calories, preferredUnit)));
 
-  const chooseUnit = (next: EnergyUnit) => {
-    if (next === unit) return;
+  const switchUnit = () => {
+    const next: EnergyUnit = unit === "kcal" ? "kJ" : "kcal";
     const entered = Number(text);
     setText(text === "" || !Number.isFinite(entered) ? text : String(energyInputValue(caloriesFromEnergy(entered, unit), next)));
     setUnit(next);
@@ -25,8 +25,6 @@ export function EnergyInput({ calories, onCaloriesChange }: {
       const entered = Number(next);
       onCaloriesChange(next === "" || !Number.isFinite(entered) ? undefined : caloriesFromEnergy(entered, unit));
     }}/>
-    <div className="energy-entry-units" role="group" aria-label="Energy unit">
-      {(["kcal", "kJ"] as const).map((option) => <button key={option} type="button" aria-pressed={unit === option} onClick={() => chooseUnit(option)}>{option}</button>)}
-    </div>
+    <button className="energy-entry-unit" data-unit={unit} type="button" onClick={switchUnit} aria-label={`Energy unit ${unit}. Switch to ${unit === "kcal" ? "kilojoules" : "kilocalories"}`}>{unit}</button>
   </div>;
 }
