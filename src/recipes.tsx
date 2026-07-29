@@ -9,6 +9,7 @@ import { recipeIngredientsFromLogged, recipeSnapshot, scaleLoggedRecipe } from "
 import { createSnapshot, roundMacro } from "./domain/nutrition";
 import { matchesFoodSearch } from "./domain/foodSearch";
 import { EnergyText } from "./energyDisplay";
+import { NumericInput } from "./NumericInput";
 import type { DayFoodEntry, Food, FoodCategory, FoodUnit, ISODate, LoggedRecipe, LoggedRecipeIngredient, Recipe, RecipeIngredient } from "./domain/types";
 const RecipeImport=lazy(()=>import("./recipeImport").then(module=>({default:module.RecipeImport})));
 export function RecipePanel({ date, foods, categories, onLogged }: {
@@ -125,7 +126,7 @@ function SavedIngredientRow({item,food,categoryColour,editing,selected,onSelect,
   const cardActivation=editing?{}:listeners;
   return <div ref={setNodeRef} onClick={editing?onSelect:undefined} {...cardActivation} className={`ingredient-card ${editing?"editing":""} ${selected?"selected":""} ${isDragging?"ingredient-dragging":""}`} style={{"--cat":categoryColour,transform:CSS.Transform.toString(transform),transition} as React.CSSProperties}>
     <span><strong>{food?.name??"Missing food"}</strong><small>{food?.calculationMode==="per100"?`per 100 ${food.baseUnit}`:food?.servingDescription??food?.baseUnit}</small></span>
-    <label><span className="sr-only">Quantity for {food?.name}</span><input type="number" min="0.01" step="any" inputMode="decimal" value={item.quantity} onChange={e=>onQuantity(Number(e.target.value))}/><small>{food?.baseUnit}</small></label>
+    <label><span className="sr-only">Quantity for {food?.name}</span><NumericInput min="0.01" step="any" inputMode="decimal" value={item.quantity} onValueChange={onQuantity}/><small>{food?.baseUnit}</small></label>
     <label className="ingredient-group"><span className="sr-only">Group for {food?.name}</span><input value={item.group??""} onChange={e=>onGroup(e.target.value)} placeholder="Group (optional), e.g. Sauce"/></label>
     {editing&&<div className="ingredient-drag-actions"><button className="ingredient-grip" aria-label={`Reorder ${food?.name??"ingredient"}`} {...attributes} {...listeners}><GripVertical/></button></div>}
   </div>;
@@ -137,7 +138,7 @@ function LoggedIngredientRow({ingredient,categoryColour,editing,selected,onSelec
   return <div ref={setNodeRef} onClick={editing?onSelect:undefined} {...cardActivation} className={`ingredient-card ${editing?"editing":""} ${ingredient.enabled?"":"disabled"} ${selected?"selected":""} ${isDragging?"ingredient-dragging":""}`} style={{"--cat":categoryColour,transform:CSS.Transform.toString(transform),transition} as React.CSSProperties}>
     <input type="checkbox" aria-label={`Include ${ingredient.snapshot.name}`} checked={ingredient.enabled} onChange={e=>onToggle(e.target.checked)}/>
     <span><strong>{ingredient.snapshot.name}</strong><small>{ingredient.group&&<b className="instance-group">{ingredient.group} · </b>}<EnergyText calories={ingredient.snapshot.calories} /></small></span>
-    <span className="instance-quantity"><input aria-label={`Quantity for ${ingredient.snapshot.name}`} type="number" min="0.01" step="any" inputMode="decimal" value={ingredient.snapshot.quantity} onChange={e=>onQuantity(Number(e.target.value))}/><small>{ingredient.snapshot.unit}</small></span>
+    <span className="instance-quantity"><NumericInput aria-label={`Quantity for ${ingredient.snapshot.name}`} min="0.01" step="any" inputMode="decimal" value={ingredient.snapshot.quantity} onValueChange={onQuantity}/><small>{ingredient.snapshot.unit}</small></span>
     {editing&&<div className="ingredient-drag-actions"><button className="ingredient-grip" aria-label={`Reorder ${ingredient.snapshot.name}`} {...attributes} {...listeners}><GripVertical/></button></div>}
   </div>;
 }

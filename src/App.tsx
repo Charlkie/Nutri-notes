@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   addDays,
@@ -37,6 +37,7 @@ import {
   CalendarDays,
   CalendarRange,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleHelp,
@@ -138,11 +139,11 @@ import { foodUnitLabel, formatFoodQuantity } from "./domain/foodQuantity";
 import { matchesFoodSearch } from "./domain/foodSearch";
 import { EnergyDisplayProvider, EnergyText, useEnergyDisplay } from "./energyDisplay";
 import { EnergyInput } from "./energyInput";
+import { NumericInput } from "./NumericInput";
 import {
   isPrimaryRoute,
   navigationHash,
   parseNavigationHash,
-  routeAfterSwipe,
   type PrimaryRoute,
 } from "./domain/navigation";
 import {
@@ -220,8 +221,9 @@ export default function App() {
   const [editingTemplate, setEditingTemplate] = useState<DietTemplate>();
   const [toast, setToast] = useState<Toast>();
   const [dbError, setDbError] = useState<string>();
-  const screenSwipe = useRef<{ x: number; y: number; startedAt: number }>();
+  const screenSwipe = useRef<{ x: number; y: number; startedAt: number; pointerId:number; onCard:boolean; target:Element }>();
   const suppressSwipeClickUntil = useRef(0);
+  const suppressSwipeClickTarget = useRef<Element>();
   const dropbox = useDropboxBackup();
   const googleDrive = useGoogleDriveBackup(route === "settings");
   const date = isoDate(selectedDate);
@@ -277,34 +279,44 @@ export default function App() {
       setRoute("picker");
     } else setRoute(next);
   };
-  const beginScreenSwipe=(event:TouchEvent<HTMLDivElement>)=>{
-    if(!isPrimaryRoute(route)||event.touches.length!==1)return;
+  const beginScreenSwipe=(event:PointerEvent<HTMLDivElement>)=>{
+    if(route!=="day"||!event.isPrimary||event.pointerType!=="touch")return;
     const target=event.target as Element;
     if(target.closest("input, textarea, select, [role='slider'], [data-no-screen-swipe], .chips, .period-tabs, .trend-metrics, .drag-handle, .ingredient-grip, .template-grip"))return;
-    const touch=event.touches[0];
-    if(!touch)return;
-    screenSwipe.current={x:touch.clientX,y:touch.clientY,startedAt:performance.now()};
+    screenSwipe.current={x:event.clientX,y:event.clientY,startedAt:performance.now(),pointerId:event.pointerId,onCard:Boolean(target.closest(".food-card")),target};
   };
-  const continueScreenSwipe=(event:TouchEvent<HTMLDivElement>)=>{
+  const continueScreenSwipe=(event:PointerEvent<HTMLDivElement>)=>{
     const started=screenSwipe.current;
-    const touch=event.touches[0];
-    if(!started||!touch)return;
-    const dx=touch.clientX-started.x;
-    const dy=touch.clientY-started.y;
-    if(Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)*1.2)event.preventDefault();
+    if(!started||started.pointerId!==event.pointerId)return;
+    const dx=event.clientX-started.x;
+    const dy=event.clientY-started.y;
+    if(Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)*1.2){if(!event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.setPointerCapture(event.pointerId);event.preventDefault()}
   };
-  const finishScreenSwipe=(event:TouchEvent<HTMLDivElement>)=>{
+  const finishScreenSwipe=(event:PointerEvent<HTMLDivElement>)=>{
     const started=screenSwipe.current;
     screenSwipe.current=undefined;
-    if(!started||!isPrimaryRoute(route))return;
-    const touch=event.changedTouches[0];
-    if(!touch)return;
-    const dx=touch.clientX-started.x;
-    const dy=touch.clientY-started.y;
-    if(Math.abs(dx)<64||Math.abs(dx)<Math.abs(dy)*1.35||performance.now()-started.startedAt>750)return;
+    if(!started||started.pointerId!==event.pointerId||route!=="day")return;
+    const dx=event.clientX-started.x;
+    const dy=event.clientY-started.y;
+    const duration=performance.now()-started.startedAt;
+    if(Math.abs(dx)<64||Math.abs(dx)<Math.abs(dy)*1.35||duration>750||(started.onCard&&duration>300))return;
     event.preventDefault();
     suppressSwipeClickUntil.current=performance.now()+450;
-    setRoute(routeAfterSwipe(route,dx<0?"left":"right"));
+    suppressSwipeClickTarget.current=started.target;
+    setSelectedDate(current=>addDays(current,dx<0?1:-1));
+  };
+  const clearZeroForEditing=(event:React.KeyboardEvent<HTMLDivElement>)=>{
+    const input=event.target;
+    if(event.key!=="Backspace"||!(input instanceof HTMLInputElement)||input.type!=="number"||input.value!=="0")return;
+    event.preventDefault();
+    input.value="";
+  };
+  const clearZeroBeforeInput=(event:React.FormEvent<HTMLDivElement>)=>{
+    const native=event.nativeEvent as InputEvent;
+    const input=event.target;
+    if(native.inputType!=="deleteContentBackward"||!(input instanceof HTMLInputElement)||input.type!=="number"||input.value!=="0")return;
+    event.preventDefault();
+    input.value="";
   };
   if (dbError)
     return (
@@ -323,8 +335,9 @@ export default function App() {
         void saveAppSettings({ ...appSettings, energyUnit });
       }}
     >
-    <div className="app-shell" onTouchStart={beginScreenSwipe} onTouchMove={continueScreenSwipe} onTouchEnd={finishScreenSwipe} onTouchCancel={()=>{screenSwipe.current=undefined}} onClickCapture={event=>{if(performance.now()<suppressSwipeClickUntil.current){event.preventDefault();event.stopPropagation()}}}>
-      {route === "day" && (
+    <div className="app-shell" onPointerDown={beginScreenSwipe} onPointerMove={continueScreenSwipe} onPointerUp={finishScreenSwipe} onPointerCancel={()=>{screenSwipe.current=undefined}} onKeyDownCapture={clearZeroForEditing} onBeforeInputCapture={clearZeroBeforeInput} onClickCapture={event=>{const target=event.target as Node;const swiped=suppressSwipeClickTarget.current;if(performance.now()<suppressSwipeClickUntil.current&&swiped&&(swiped===target||swiped.contains(target))){event.preventDefault();event.stopPropagation();suppressSwipeClickTarget.current=undefined}}}>
+      {isPrimaryRoute(route) && (
+        <div className="tracking-layer" aria-hidden={route!=="day"||undefined} ref={element=>{if(element)element.inert=route!=="day"}}>
         <DayScreen
           date={date}
           selectedDate={selectedDate}
@@ -358,6 +371,7 @@ export default function App() {
           }}
           onToast={setToast}
         />
+        </div>
       )}
       {route === "picker" && (
         <FoodPicker
@@ -485,7 +499,7 @@ export default function App() {
           }}
         />
       )}
-      {route === "calendar" && (
+      {route === "calendar" && <AuxiliaryOverlay label="Calendar" onMinimise={goDay}>
         <CalendarScreen
           selectedDate={selectedDate}
           categories={categories}
@@ -496,12 +510,12 @@ export default function App() {
             setRoute("day");
           }}
         />
-      )}
-      {route === "body" && (
+      </AuxiliaryOverlay>}
+      {route === "body" && <AuxiliaryOverlay label="Body" onMinimise={goDay}>
         <BodyScreen unit={appSettings.weightUnit} onToast={setToast} />
-      )}
-      {route === "charts" && <ChartsScreen categories={categories} />}
-      {route === "settings" && (
+      </AuxiliaryOverlay>}
+      {route === "charts" && <AuxiliaryOverlay label="Charts" onMinimise={goDay}><ChartsScreen categories={categories} /></AuxiliaryOverlay>}
+      {route === "settings" && <AuxiliaryOverlay label="Settings" onMinimise={goDay}>
         <SettingsScreen
           categories={categories}
           settings={appSettings}
@@ -509,7 +523,7 @@ export default function App() {
           googleDrive={googleDrive}
           onToast={setToast}
         />
-      )}
+      </AuxiliaryOverlay>}
       {route !== "picker" &&
         route !== "foodForm" &&
         route !== "foodImport" &&
@@ -564,7 +578,7 @@ function DayScreen({
   const [convertOpen, setConvertOpen] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [nameConflict, setNameConflict] = useState(false);
-  const [selectedId, setSelectedId] = useState<string>();
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(()=>new Set());
   const sensors = useSensors(
     useSensor(TouchSensor, {
       activationConstraint: { delay: 380, tolerance: 8 },
@@ -582,14 +596,17 @@ function DayScreen({
     );
   const totals = sumEntries(data.entries);
   const categoryMap = new Map(categories.map((c) => [c.id, c]));
-  const editing = selectedId !== undefined;
-  const remove = async (entry: DayFoodEntry) => {
-    await db.entries.delete(entry.id);
-    setSelectedId(undefined);
+  const editing = selectedIds.size>0;
+  const selectedId = selectedIds.size===1?[...selectedIds][0]:undefined;
+  const removeSelected = async () => {
+    const entries=data.entries.filter(entry=>selectedIds.has(entry.id));
+    if(!entries.length)return;
+    await db.entries.bulkDelete(entries.map(entry=>entry.id));
+    setSelectedIds(new Set());
     onToast({
-      message: `${entry.snapshot.name} deleted`,
+      message: entries.length===1?`${entries[0]!.snapshot.name} deleted`:`${entries.length} entries deleted`,
       undo: async () => {
-        await db.entries.put(entry);
+        await db.entries.bulkPut(entries);
       },
     });
   };
@@ -612,7 +629,7 @@ function DayScreen({
       (e) => e.id,
     );
     await reorderDayEntries(ordered);
-    setSelectedId(String(active.id));
+    setSelectedIds(new Set([String(active.id)]));
   };
   const saveTemplate = async (
     conflict: "error" | "replace" | "copy" = "error",
@@ -721,11 +738,11 @@ function DayScreen({
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragStart={({ active }) => {
-            setSelectedId(String(active.id));
+            setSelectedIds(new Set([String(active.id)]));
             navigator.vibrate?.(15);
           }}
           onDragEnd={dragEnd}
-          onDragCancel={() => setSelectedId(undefined)}
+          onDragCancel={() => setSelectedIds(new Set())}
         >
           <SortableContext
             items={data.entries.map((e) => e.id)}
@@ -738,11 +755,9 @@ function DayScreen({
                   entry={entry}
                   category={categoryMap.get(entry.snapshot.categoryId)}
                   editing={editing}
-                  selected={selectedId === entry.id}
-                  onSelect={() => setSelectedId(entry.id)}
-                  onEdit={() =>
-                    editing ? setSelectedId(entry.id) : onEdit(entry)
-                  }
+                  selected={selectedIds.has(entry.id)}
+                  canReorder={selectedIds.size===1}
+                  onEdit={()=>editing?setSelectedIds(current=>{const next=new Set(current);if(next.has(entry.id))next.delete(entry.id);else next.add(entry.id);return next}):onEdit(entry)}
                 />
               ))}
               <button className="add-another" onClick={onPick}>
@@ -753,14 +768,14 @@ function DayScreen({
         </DndContext>
       )}
       {editing && (
-        <div className="edit-toolbar" aria-label="Reorder selected food">
-          <button onClick={() => setSelectedId(undefined)}>
+        <div className="edit-toolbar" role="toolbar" aria-label={`Edit ${selectedIds.size} selected ${selectedIds.size===1?"entry":"entries"}`}>
+          <button onClick={() => setSelectedIds(new Set())}>
             <Check />
             <span>Done</span>
           </button>
           <button
             onClick={() => void moveSelected(-1)}
-            disabled={data.entries.findIndex((e) => e.id === selectedId) <= 0}
+            disabled={selectedIds.size!==1||data.entries.findIndex((e) => e.id === selectedId) <= 0}
           >
             <ArrowUp />
             <span>Move up</span>
@@ -768,7 +783,7 @@ function DayScreen({
           <button
             onClick={() => void moveSelected(1)}
             disabled={
-              data.entries.findIndex((e) => e.id === selectedId) >=
+              selectedIds.size!==1||data.entries.findIndex((e) => e.id === selectedId) >=
               data.entries.length - 1
             }
           >
@@ -776,19 +791,16 @@ function DayScreen({
             <span>Move down</span>
           </button>
           <button
-            onClick={() => {
-              const entry = data.entries.find((e) => e.id === selectedId);
-              if (entry) void remove(entry);
-            }}
+            onClick={() => void removeSelected()}
           >
             <Trash2 />
-            <span>Delete</span>
+            <span>Delete{selectedIds.size>1?` ${selectedIds.size}`:""}</span>
           </button>
         </div>
       )}
       {convertOpen && (
         <div className="dialog-backdrop" role="presentation">
-          <form className="dialog" onSubmit={convert}>
+          <form className="dialog template-convert-dialog" onSubmit={convert}>
             <h2>Convert day to template</h2>
             <p>
               {nameConflict
@@ -803,7 +815,6 @@ function DayScreen({
                   setTemplateName(e.target.value);
                   setNameConflict(false);
                 }}
-                autoFocus
                 placeholder="e.g. Cutting Day"
               />
             </label>
@@ -850,16 +861,17 @@ function SortableFoodCard({
   category,
   editing,
   selected,
-  onSelect,
+  canReorder,
   onEdit,
 }: {
   entry: DayFoodEntry;
   category?: FoodCategory;
   editing: boolean;
   selected: boolean;
-  onSelect: () => void;
+  canReorder: boolean;
   onEdit: () => void;
 }) {
+  const touchSelectionHandled=useRef(false);
   const {
     attributes,
     listeners,
@@ -880,13 +892,14 @@ function SortableFoodCard({
           transition,
         } as React.CSSProperties
       }
-      onClick={editing ? onSelect : undefined}
       {...cardActivation}
     >
       <button
         className="card-main"
-        onClick={onEdit}
-        aria-label={`${editing ? "Select" : "Edit"} ${entry.snapshot.name}`}
+        onPointerUp={event=>{if(editing&&event.pointerType==="touch"){touchSelectionHandled.current=true;onEdit()}}}
+        onClick={()=>{if(touchSelectionHandled.current){touchSelectionHandled.current=false;return}onEdit()}}
+        aria-label={`${editing ? selected?"Deselect":"Select" : "Edit"} ${entry.snapshot.name}`}
+        aria-pressed={editing?selected:undefined}
       >
         <span className="category-stripe" />
         <span className="card-content">
@@ -917,6 +930,7 @@ function SortableFoodCard({
         <button
           className="drag-handle"
           aria-label={`Reorder ${entry.snapshot.name}`}
+          disabled={!canReorder}
           {...attributes}
           {...listeners}
         >
@@ -1610,13 +1624,12 @@ function TemplateScheduleDialog({
           </label>
           <label>
             Duration (weeks)
-            <input
-              type="number"
+            <NumericInput
               inputMode="numeric"
               min="1"
               max="52"
               value={weeks}
-              onChange={(event) => setWeeks(Number(event.target.value))}
+              onValueChange={setWeeks}
             />
           </label>
         </div>
@@ -2542,9 +2555,13 @@ function CalendarScreen({
   onOpenDay: (d: Date) => void;
 }) {
   const [month, setMonth] = useState(startOfMonth(selectedDate));
-  const grid = monthGrid(month, weekStartsOn);
-  const firstIso = isoDate(grid[0] ?? month);
-  const lastIso = isoDate(grid.at(-1) ?? month);
+  const months=useMemo(()=>Array.from({length:13},(_,index)=>addMonths(month,index-6)),[month]);
+  const firstGrid=monthGrid(months[0]!,weekStartsOn);
+  const lastGrid=monthGrid(months.at(-1)!,weekStartsOn);
+  const firstIso = isoDate(firstGrid[0] ?? months[0]!);
+  const lastIso = isoDate(lastGrid.at(-1) ?? months.at(-1)!);
+  const currentMonthRef=useRef<HTMLElement>(null);
+  useEffect(()=>{currentMonthRef.current?.scrollIntoView({block:"start"})},[month]);
   const history = useLiveQuery(async () => {
     const days = await db.days
       .where("date")
@@ -2589,10 +2606,7 @@ function CalendarScreen({
     entriesByDay.set(entry.dayId, group);
   }
   const categoryMap = new Map(categories.map((c) => [c.id, c]));
-  const choose = (date: Date) => {
-    onSelectDate(date);
-    if (!isSameMonth(date, month)) setMonth(startOfMonth(date));
-  };
+  const choose = (date: Date) => onSelectDate(date);
   const weekdays =
     weekStartsOn === 1
       ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -2615,7 +2629,7 @@ function CalendarScreen({
           Today
         </button>
       </header>
-      <section className="month-section">
+      <section className="month-browser">
         <div className="month-nav">
           <button
             className="icon-button"
@@ -2653,9 +2667,13 @@ function CalendarScreen({
             <span key={d}>{d}</span>
           ))}
         </div>
+        <div className="calendar-month-scroll">
+        {months.map(shownMonth=><section className="scroll-month" key={format(shownMonth,"yyyy-MM")} ref={isSameMonth(shownMonth,month)?currentMonthRef:undefined}>
+        <h2>{format(shownMonth,"MMMM yyyy")}</h2>
         <div className="month-grid">
-          {grid.map((day) => {
+          {monthGrid(shownMonth,weekStartsOn).map((day) => {
             const dayIso = isoDate(day);
+            if(!isSameMonth(day,shownMonth))return <span className="empty-calendar-day" key={dayIso}/>;
             const log = dayByDate.get(dayIso);
             const dayEntries = log ? (entriesByDay.get(log.id) ?? []) : [];
             const dots = [
@@ -2669,7 +2687,7 @@ function CalendarScreen({
             return (
               <button
                 key={dayIso}
-                className={`${!isSameMonth(day, month) ? "outside" : ""} ${isSameDay(day, selectedDate) ? "selected" : ""} ${isSameDay(day, new Date()) ? "today" : ""} ${scheduled ? "scheduled" : ""} ${scheduleState}`}
+                className={`${isSameDay(day, selectedDate) ? "selected" : ""} ${isSameDay(day, new Date()) ? "today" : ""} ${scheduled ? "scheduled" : ""} ${scheduleState}`}
                 onClick={() => choose(day)}
                 aria-label={`${format(day, "d MMMM yyyy")}${dayEntries.length ? `, ${dayEntries.length} foods` : ""}${scheduled ? `, ${projection?.exception?.mode==="skip"?"skipped from":projection?.exception?.mode==="template"?`substituted with ${projection.exception.templateName}, scheduled from`:projection?.conflict?"schedule conflict from":"scheduled from"} ${scheduled.templateName}` : ""}`}
               >
@@ -2685,6 +2703,8 @@ function CalendarScreen({
               </button>
             );
           })}
+        </div>
+        </section>)}
         </div>
       </section>
       <section className="history-preview">
@@ -4074,12 +4094,11 @@ function PreferencesEditor({
             (key) => (
               <label key={key}>
                 <span>{key === "carbohydrates" ? "Carbs" : key}</span>
-                <input
-                  type="number"
+                <NumericInput
                   min="0"
                   inputMode="decimal"
                   value={value.targets[key]}
-                  onChange={(e) => target(key, e.target.value)}
+                  onValueChange={(next) => target(key, String(next))}
                 />
                 <small>{key === "calories" ? "kcal" : "g"}</small>
               </label>
@@ -4232,6 +4251,9 @@ function CategoryEditor({
       </form>
     </div>
   );
+}
+function AuxiliaryOverlay({label,onMinimise,children}:{label:string;onMinimise:()=>void;children:React.ReactNode}){
+  return <section className="auxiliary-overlay" aria-label={label}><button className="auxiliary-minimise" onClick={onMinimise} aria-label={`Minimise ${label}`}><ChevronDown/></button>{children}</section>;
 }
 function BottomNav({
   active,

@@ -22,6 +22,7 @@ import "./energyInput.css";
 import "./recipeList.css";
 import "./recipeIngredientPicker.css";
 import "./swipeNavigation.css";
+import "./auxiliaryNavigation.css";
 import "./schedules.css";
 import "./accessibility.css";
 import "./dropbox.css";

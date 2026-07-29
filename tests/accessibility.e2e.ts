@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 async function expectNoSeriousViolations(page: Page) {
   const results = await new AxeBuilder({ page }).analyze();
@@ -8,17 +8,27 @@ async function expectNoSeriousViolations(page: Page) {
 }
 
 async function swipeScreen(page:Page,from:{x:number;y:number},to:{x:number;y:number}){
-  await page.locator("main").evaluate((target,{from,to})=>{
-    const make=(point:{x:number;y:number})=>new Touch({identifier:7,target,clientX:point.x,clientY:point.y,screenX:point.x,screenY:point.y,radiusX:2,radiusY:2,rotationAngle:0,force:0.5});
-    target.dispatchEvent(new TouchEvent("touchstart",{bubbles:true,cancelable:true,touches:[make(from)],targetTouches:[make(from)],changedTouches:[make(from)]}));
-    target.dispatchEvent(new TouchEvent("touchend",{bubbles:true,cancelable:true,touches:[],targetTouches:[],changedTouches:[make(to)]}));
-  },{from,to});
+  const session=await page.context().newCDPSession(page);
+  await session.send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[{x:from.x,y:from.y}]});
+  for(const progress of [0.25,0.5,0.75,1])await session.send("Input.dispatchTouchEvent",{type:"touchMove",touchPoints:[{x:from.x+(to.x-from.x)*progress,y:from.y+(to.y-from.y)*progress}]});
+  await session.send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});
+  await session.detach();
+}
+
+async function tapTouch(page:Page,target:Locator){
+  const box=await target.boundingBox();
+  expect(box).not.toBeNull();
+  const point={x:box!.x+box!.width/2,y:box!.y+box!.height/2};
+  const session=await page.context().newCDPSession(page);
+  await session.send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[point]});
+  await session.send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});
+  await session.detach();
 }
 
 test("primary screens have no serious automated accessibility violations", async ({ page }) => {
   for (const screen of ["day", "body", "calendar", "charts", "settings"] as const) {
     await page.goto(`/#screen=${screen}&date=2026-07-27`);
-    await page.locator("main").waitFor();
+    await (screen==="day"?page.locator(".day-screen"):page.locator(".auxiliary-overlay > main")).waitFor();
     if (screen === "settings")
       await Promise.all([
         expect(
@@ -30,13 +40,27 @@ test("primary screens have no serious automated accessibility violations", async
   }
 });
 
-test("horizontal swipes work across primary content and from the screen edge",async({page})=>{
-  await page.goto("/#screen=body&date=2026-07-27");
-  await expect(page.getByRole("button",{name:"Body",exact:true})).toHaveAttribute("aria-current","page");
+test("horizontal swipes change days and secondary screens minimise to the tracker",async({page})=>{
+  await page.goto("/#screen=day&date=2026-07-27");
+  await expect(page.getByText("27 July 2026",{exact:true})).toBeVisible();
   await swipeScreen(page,{x:330,y:430},{x:80,y:430});
-  await expect(page.getByRole("button",{name:"Calendar",exact:true})).toHaveAttribute("aria-current","page");
+  await expect(page.getByText("28 July 2026",{exact:true})).toBeVisible();
   await swipeScreen(page,{x:20,y:430},{x:300,y:430});
-  await expect(page.getByRole("button",{name:"Body",exact:true})).toHaveAttribute("aria-current","page");
+  await expect(page.getByText("27 July 2026",{exact:true})).toBeVisible();
+  await page.getByRole("button",{name:"Body",exact:true}).click();
+  await expect(page.getByRole("button",{name:"Minimise Body"})).toBeVisible();
+  await expect(page.locator(".day-screen")).toHaveCount(1);
+  await page.getByRole("button",{name:"Minimise Body"}).click();
+  await expect(page.getByRole("button",{name:"Minimise Body"})).toHaveCount(0);
+});
+
+test("calendar presents a vertically scrollable run of months",async({page})=>{
+  await page.goto("/#screen=calendar&date=2026-07-27");
+  const months=page.locator(".calendar-month-scroll");
+  await expect(months.locator(".scroll-month")).toHaveCount(13);
+  const before=await months.evaluate(element=>element.scrollTop);
+  await months.evaluate(element=>element.scrollBy({top:250,behavior:"instant"}));
+  await expect.poll(()=>months.evaluate(element=>element.scrollTop)).toBeGreaterThan(before);
 });
 
 test("food and recipe picker has labelled, accessible controls", async ({ page }) => {
@@ -110,6 +134,46 @@ test("renaming a recipe updates its existing day card", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Edit Beef Rice Bowl" })).toHaveCount(0);
 });
 
+test("long-press edit mode supports selecting and deleting multiple entries",async({page})=>{
+  await page.goto("/#screen=day&date=2026-07-27");
+  for(let index=0;index<2;index+=1){
+    await page.getByRole("button",{name:"Food",exact:true}).click();
+    await page.getByRole("button",{name:"Recipes",exact:true}).click();
+    await page.getByRole("button",{name:"Log",exact:true}).first().click();
+    await page.getByRole("button",{name:"Log recipe"}).click();
+  }
+  const cards=page.locator(".food-card .card-main");
+  await expect(cards).toHaveCount(2);
+  const box=await cards.first().boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x+box!.width/2,box!.y+box!.height/2);
+  await page.mouse.down();
+  await page.waitForTimeout(420);
+  await page.mouse.up();
+  await expect(page.getByRole("toolbar",{name:"Edit 1 selected entry"})).toBeVisible();
+  await tapTouch(page,page.getByRole("button",{name:"Select Beef Rice Bowl",exact:true}));
+  await expect(page.getByRole("toolbar",{name:"Edit 2 selected entries"})).toBeVisible();
+  await page.getByRole("button",{name:"Delete 2"}).click();
+  await expect(page.locator(".food-card")).toHaveCount(0);
+  await expect(page.getByText("2 entries deleted")).toBeVisible();
+  await page.getByRole("button",{name:"Undo"}).click();
+  await expect(page.locator(".food-card")).toHaveCount(2);
+});
+
+test("convert-day dialog opens without focusing or zooming its name field",async({page})=>{
+  await page.goto("/#screen=day&date=2026-07-27");
+  await page.getByRole("button",{name:"Food",exact:true}).click();
+  await page.getByRole("button",{name:"Recipes",exact:true}).click();
+  await page.getByRole("button",{name:"Log",exact:true}).first().click();
+  await page.getByRole("button",{name:"Log recipe"}).click();
+  await page.getByRole("button",{name:"Day options"}).click();
+  await page.getByRole("button",{name:"Convert to Template"}).click();
+  const name=page.getByPlaceholder("e.g. Cutting Day");
+  await expect(name).toBeVisible();
+  await expect(name).not.toBeFocused();
+  await expect(name).toHaveCSS("font-size","16px");
+});
+
 test("Australian fast food catalogue finds Chicken Rappa offline and requires review", async ({ page }) => {
   await page.goto("/#screen=day&date=2026-07-27");
   await page.getByRole("button", { name: "Food", exact: true }).click();
@@ -161,6 +225,16 @@ test("custom food energy can be entered in kcal or kJ", async ({ page }) => {
   await page.getByRole("button", { name: /Energy unit kJ/i }).click();
   await expect(page.getByRole("spinbutton", { name: "Energy in kilocalories" })).toHaveValue("200");
   await expectNoSeriousViolations(page);
+});
+
+test("numeric fields can clear zero before entering a replacement value",async({page})=>{
+  await page.goto("/#screen=settings&date=2026-07-27");
+  const calories=page.locator(".preferences input[type=number]").first();
+  await calories.fill("0");
+  await calories.press("Backspace");
+  await expect(calories).toHaveValue("");
+  await calories.pressSequentially("2500");
+  await expect(calories).toHaveValue("2500");
 });
 
 test("add weight opens without focusing or zooming the numeric field", async ({ page }) => {
