@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   addDays,
@@ -221,13 +221,15 @@ export default function App() {
   const [editingTemplate, setEditingTemplate] = useState<DietTemplate>();
   const [toast, setToast] = useState<Toast>();
   const [dbError, setDbError] = useState<string>();
-  const screenSwipe = useRef<{ x: number; y: number; startedAt: number; pointerId:number; onCard:boolean; target:Element }>();
+  const appShellRef = useRef<HTMLDivElement>(null);
+  const routeRef = useRef(route);
   const suppressSwipeClickUntil = useRef(0);
   const suppressSwipeClickTarget = useRef<Element>();
   const dropbox = useDropboxBackup();
   const googleDrive = useGoogleDriveBackup(route === "settings");
   const date = isoDate(selectedDate);
   const data = useDay(date);
+  routeRef.current = route;
   const categories =
     useLiveQuery(() => db.categories.orderBy("sortIndex").toArray(), []) ?? [];
   const appSettings =
@@ -279,32 +281,52 @@ export default function App() {
       setRoute("picker");
     } else setRoute(next);
   };
-  const beginScreenSwipe=(event:PointerEvent<HTMLDivElement>)=>{
-    if(route!=="day"||!event.isPrimary||event.pointerType!=="touch")return;
-    const target=event.target as Element;
-    if(target.closest("input, textarea, select, [role='slider'], [data-no-screen-swipe], .chips, .period-tabs, .trend-metrics, .drag-handle, .ingredient-grip, .template-grip"))return;
-    screenSwipe.current={x:event.clientX,y:event.clientY,startedAt:performance.now(),pointerId:event.pointerId,onCard:Boolean(target.closest(".food-card")),target};
-  };
-  const continueScreenSwipe=(event:PointerEvent<HTMLDivElement>)=>{
-    const started=screenSwipe.current;
-    if(!started||started.pointerId!==event.pointerId)return;
-    const dx=event.clientX-started.x;
-    const dy=event.clientY-started.y;
-    if(Math.abs(dx)>12&&Math.abs(dx)>Math.abs(dy)*1.2){if(!event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.setPointerCapture(event.pointerId);event.preventDefault()}
-  };
-  const finishScreenSwipe=(event:PointerEvent<HTMLDivElement>)=>{
-    const started=screenSwipe.current;
-    screenSwipe.current=undefined;
-    if(!started||started.pointerId!==event.pointerId||route!=="day")return;
-    const dx=event.clientX-started.x;
-    const dy=event.clientY-started.y;
-    const duration=performance.now()-started.startedAt;
-    if(Math.abs(dx)<64||Math.abs(dx)<Math.abs(dy)*1.35||duration>750||(started.onCard&&duration>300))return;
-    event.preventDefault();
-    suppressSwipeClickUntil.current=performance.now()+450;
-    suppressSwipeClickTarget.current=started.target;
-    setSelectedDate(current=>addDays(current,dx<0?1:-1));
-  };
+  useEffect(() => {
+    const shell = appShellRef.current;
+    if (!shell) return;
+    let swipe: { x:number; y:number; startedAt:number; onCard:boolean; target:Element } | undefined;
+    const excluded = "input, textarea, select, [role='slider'], [data-no-screen-swipe], .chips, .period-tabs, .trend-metrics, .drag-handle, .ingredient-grip, .template-grip";
+    const start = (event:TouchEvent) => {
+      if (routeRef.current !== "day" || event.touches.length !== 1) return;
+      const target = event.target as Element;
+      if (target.closest(excluded)) return;
+      const touch = event.touches[0]!;
+      swipe = { x:touch.clientX, y:touch.clientY, startedAt:performance.now(), onCard:Boolean(target.closest(".food-card")), target };
+    };
+    const move = (event:TouchEvent) => {
+      if (!swipe || event.touches.length !== 1) return;
+      const touch = event.touches[0]!;
+      const dx = touch.clientX - swipe.x;
+      const dy = touch.clientY - swipe.y;
+      const heldCard = swipe.onCard && performance.now() - swipe.startedAt > 300;
+      if (!heldCard && Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.2) event.preventDefault();
+    };
+    const end = (event:TouchEvent) => {
+      const started = swipe;
+      swipe = undefined;
+      const touch = event.changedTouches[0];
+      if (!started || !touch || routeRef.current !== "day") return;
+      const dx = touch.clientX - started.x;
+      const dy = touch.clientY - started.y;
+      const duration = performance.now() - started.startedAt;
+      if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.35 || duration > 750 || (started.onCard && duration > 300)) return;
+      event.preventDefault();
+      suppressSwipeClickUntil.current = performance.now() + 450;
+      suppressSwipeClickTarget.current = started.target;
+      setSelectedDate(current => addDays(current, dx < 0 ? 1 : -1));
+    };
+    const cancel = () => { swipe = undefined; };
+    shell.addEventListener("touchstart", start, { passive:true });
+    shell.addEventListener("touchmove", move, { passive:false });
+    shell.addEventListener("touchend", end, { passive:false });
+    shell.addEventListener("touchcancel", cancel);
+    return () => {
+      shell.removeEventListener("touchstart", start);
+      shell.removeEventListener("touchmove", move);
+      shell.removeEventListener("touchend", end);
+      shell.removeEventListener("touchcancel", cancel);
+    };
+  }, []);
   const clearZeroForEditing=(event:React.KeyboardEvent<HTMLDivElement>)=>{
     const input=event.target;
     if(event.key!=="Backspace"||!(input instanceof HTMLInputElement)||input.type!=="number"||input.value!=="0")return;
@@ -335,7 +357,7 @@ export default function App() {
         void saveAppSettings({ ...appSettings, energyUnit });
       }}
     >
-    <div className="app-shell" onPointerDown={beginScreenSwipe} onPointerMove={continueScreenSwipe} onPointerUp={finishScreenSwipe} onPointerCancel={()=>{screenSwipe.current=undefined}} onKeyDownCapture={clearZeroForEditing} onBeforeInputCapture={clearZeroBeforeInput} onClickCapture={event=>{const target=event.target as Node;const swiped=suppressSwipeClickTarget.current;if(performance.now()<suppressSwipeClickUntil.current&&swiped&&(swiped===target||swiped.contains(target))){event.preventDefault();event.stopPropagation();suppressSwipeClickTarget.current=undefined}}}>
+    <div ref={appShellRef} className="app-shell" onKeyDownCapture={clearZeroForEditing} onBeforeInputCapture={clearZeroBeforeInput} onClickCapture={event=>{const target=event.target as Node;const swiped=suppressSwipeClickTarget.current;if(performance.now()<suppressSwipeClickUntil.current&&swiped&&(swiped===target||swiped.contains(target))){event.preventDefault();event.stopPropagation();suppressSwipeClickTarget.current=undefined}}}>
       {isPrimaryRoute(route) && (
         <div className="tracking-layer" aria-hidden={route!=="day"||undefined} ref={element=>{if(element)element.inert=route!=="day"}}>
         <DayScreen
@@ -581,10 +603,10 @@ function DayScreen({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(()=>new Set());
   const sensors = useSensors(
     useSensor(TouchSensor, {
-      activationConstraint: { delay: 380, tolerance: 8 },
+      activationConstraint: { distance: 4 },
     }),
     useSensor(PointerSensor, {
-      activationConstraint: { delay: 350, tolerance: 6 },
+      activationConstraint: { distance: 4 },
     }),
   );
   if (data === undefined)
@@ -757,6 +779,7 @@ function DayScreen({
                   editing={editing}
                   selected={selectedIds.has(entry.id)}
                   canReorder={selectedIds.size===1}
+                  onLongPress={()=>{setSelectedIds(new Set([entry.id]));navigator.vibrate?.(15)}}
                   onEdit={()=>editing?setSelectedIds(current=>{const next=new Set(current);if(next.has(entry.id))next.delete(entry.id);else next.add(entry.id);return next}):onEdit(entry)}
                 />
               ))}
@@ -862,6 +885,7 @@ function SortableFoodCard({
   editing,
   selected,
   canReorder,
+  onLongPress,
   onEdit,
 }: {
   entry: DayFoodEntry;
@@ -869,9 +893,12 @@ function SortableFoodCard({
   editing: boolean;
   selected: boolean;
   canReorder: boolean;
+  onLongPress: () => void;
   onEdit: () => void;
 }) {
-  const touchSelectionHandled=useRef(false);
+  const longPressTimer=useRef<number>();
+  const longPressOrigin=useRef<{x:number;y:number}>();
+  const longPressed=useRef(false);
   const {
     attributes,
     listeners,
@@ -879,8 +906,22 @@ function SortableFoodCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: entry.id });
-  const cardActivation = editing ? {} : listeners;
+  } = useSortable({ id: entry.id, disabled:editing&&!canReorder });
+  const cancelLongPress=()=>{if(longPressTimer.current!==undefined)window.clearTimeout(longPressTimer.current);longPressTimer.current=undefined};
+  const startLongPress=(event:React.TouchEvent<HTMLElement>)=>{
+    if(editing||event.touches.length!==1)return;
+    const touch=event.touches[0]!;
+    longPressOrigin.current={x:touch.clientX,y:touch.clientY};
+    longPressed.current=false;
+    cancelLongPress();
+    longPressTimer.current=window.setTimeout(()=>{longPressTimer.current=undefined;longPressed.current=true;onLongPress()},420);
+  };
+  const moveLongPress=(event:React.TouchEvent<HTMLElement>)=>{
+    const origin=longPressOrigin.current;
+    const touch=event.touches[0];
+    if(!origin||!touch)return;
+    if(Math.hypot(touch.clientX-origin.x,touch.clientY-origin.y)>8)cancelLongPress();
+  };
   return (
     <article
       ref={setNodeRef}
@@ -892,12 +933,14 @@ function SortableFoodCard({
           transition,
         } as React.CSSProperties
       }
-      {...cardActivation}
+      onTouchStart={startLongPress}
+      onTouchMove={moveLongPress}
+      onTouchEnd={cancelLongPress}
+      onTouchCancel={cancelLongPress}
     >
       <button
         className="card-main"
-        onPointerUp={event=>{if(editing&&event.pointerType==="touch"){touchSelectionHandled.current=true;onEdit()}}}
-        onClick={()=>{if(touchSelectionHandled.current){touchSelectionHandled.current=false;return}onEdit()}}
+        onClick={()=>{if(longPressed.current){longPressed.current=false;return}onEdit()}}
         aria-label={`${editing ? selected?"Deselect":"Select" : "Edit"} ${entry.snapshot.name}`}
         aria-pressed={editing?selected:undefined}
       >

@@ -25,6 +25,17 @@ async function tapTouch(page:Page,target:Locator){
   await session.detach();
 }
 
+async function longPressTouch(page:Page,target:Locator){
+  const box=await target.boundingBox();
+  expect(box).not.toBeNull();
+  const point={x:box!.x+box!.width/2,y:box!.y+box!.height/2};
+  const session=await page.context().newCDPSession(page);
+  await session.send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[point]});
+  await page.waitForTimeout(460);
+  await session.send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});
+  await session.detach();
+}
+
 test("primary screens have no serious automated accessibility violations", async ({ page }) => {
   for (const screen of ["day", "body", "calendar", "charts", "settings"] as const) {
     await page.goto(`/#screen=${screen}&date=2026-07-27`);
@@ -144,12 +155,7 @@ test("long-press edit mode supports selecting and deleting multiple entries",asy
   }
   const cards=page.locator(".food-card .card-main");
   await expect(cards).toHaveCount(2);
-  const box=await cards.first().boundingBox();
-  expect(box).not.toBeNull();
-  await page.mouse.move(box!.x+box!.width/2,box!.y+box!.height/2);
-  await page.mouse.down();
-  await page.waitForTimeout(420);
-  await page.mouse.up();
+  await longPressTouch(page,cards.first());
   await expect(page.getByRole("toolbar",{name:"Edit 1 selected entry"})).toBeVisible();
   await tapTouch(page,page.getByRole("button",{name:"Select Beef Rice Bowl",exact:true}));
   await expect(page.getByRole("toolbar",{name:"Edit 2 selected entries"})).toBeVisible();
