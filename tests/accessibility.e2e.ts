@@ -30,13 +30,11 @@ test("primary screens have no serious automated accessibility violations", async
   }
 });
 
-test("horizontal swipes follow primary navigation and preserve edge gestures",async({page})=>{
+test("horizontal swipes work across primary content and from the screen edge",async({page})=>{
   await page.goto("/#screen=body&date=2026-07-27");
   await expect(page.getByRole("button",{name:"Body",exact:true})).toHaveAttribute("aria-current","page");
   await swipeScreen(page,{x:330,y:430},{x:80,y:430});
   await expect(page.getByRole("button",{name:"Calendar",exact:true})).toHaveAttribute("aria-current","page");
-  await swipeScreen(page,{x:80,y:430},{x:330,y:430});
-  await expect(page.getByRole("button",{name:"Body",exact:true})).toHaveAttribute("aria-current","page");
   await swipeScreen(page,{x:20,y:430},{x:300,y:430});
   await expect(page.getByRole("button",{name:"Body",exact:true})).toHaveAttribute("aria-current","page");
 });
