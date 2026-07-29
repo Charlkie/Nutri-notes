@@ -2245,7 +2245,11 @@ function EntryForm({
             >
               −
             </button>
-            <NumberInput value={quantity} onChange={setQuantity} />
+            <NumberInput
+              value={quantity}
+              onChange={setQuantity}
+              ariaLabel={food?.calculationMode === "perServing" ? "Servings / quantity" : `Quantity (${unit})`}
+            />
             <button
               type="button"
               onClick={() => setQuantity(String(Number(quantity) + 1))}
@@ -2356,9 +2360,11 @@ function Field({
 function NumberInput({
   value,
   onChange,
+  ariaLabel,
 }: {
   value: string;
   onChange: (v: string) => void;
+  ariaLabel?: string;
 }) {
   return (
     <input
@@ -2366,6 +2372,7 @@ function NumberInput({
       inputMode="decimal"
       min="0"
       step="any"
+      aria-label={ariaLabel}
       value={value}
       onChange={(e) => onChange(e.target.value)}
     />

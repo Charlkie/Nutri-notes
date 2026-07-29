@@ -106,12 +106,12 @@ test("per-serving custom food logs and displays as serves", async ({ page }) => 
   await page.getByRole("button", { name: "Add custom food" }).click();
   await page.getByLabel("Food name").fill("Serving unit test");
   await page.getByLabel("Per serving").check();
-  await expect(page.getByLabel("Unit")).toHaveValue("serving");
+  await expect(page.getByRole("combobox", { name: "Unit", exact: true })).toHaveValue("serving");
   await page.getByRole("spinbutton", { name: "Energy in kilocalories" }).fill("100");
   await page.getByRole("button", { name: "Save food" }).click();
   await page.getByPlaceholder("Food name, brand or category").fill("Serving unit test");
   await page.getByRole("button", { name: /Serving unit test.*Never logged/i }).click();
-  await page.getByLabel("Servings / quantity").fill("2");
+  await page.getByRole("spinbutton", { name: "Servings / quantity" }).fill("2");
   await page.getByRole("button", { name: "Add food" }).click();
   await expect(page.getByRole("button", { name: "Edit Serving unit test" }).getByText("2 serves")).toBeVisible();
 });
