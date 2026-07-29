@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   addDays,
@@ -340,8 +341,10 @@ export default function App() {
       }
       dayTransitioning.current = true;
       window.setTimeout(() => {
-        setSelectedDate(current => addDays(current, dx < 0 ? 1 : -1));
         track.style.transition = "none";
+        flushSync(() => {
+          setSelectedDate(current => addDays(current, dx < 0 ? 1 : -1));
+        });
         track.style.setProperty("--day-drag", "0px");
         requestAnimationFrame(() => requestAnimationFrame(() => {
           track.style.transition = "";
