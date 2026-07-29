@@ -387,6 +387,11 @@ export default function App() {
           categories={categories}
           onClose={() => setRoute("picker")}
           onSaved={() => setRoute("picker")}
+          onDeleted={(name) => {
+            setEditingFood(undefined);
+            setToast({ message: `${name} deleted from saved foods` });
+            setRoute("picker");
+          }}
         />
       )}
       {route === "entryForm" && (
@@ -1890,11 +1895,13 @@ function FoodForm({
   categories,
   onClose,
   onSaved,
+  onDeleted,
 }: {
   food?: Food;
   categories: FoodCategory[];
   onClose: () => void;
   onSaved: () => void;
+  onDeleted: (name: string) => void;
 }) {
   const [values, setValues] = useState(() => ({
     name: food?.name ?? "",
@@ -1912,6 +1919,7 @@ function FoodForm({
     notes: food?.notes ?? "",
   }));
   const [error, setError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const set = (key: string, value: string) =>
     setValues((v) => ({ ...v, [key]: value }));
   const save = async (e: React.FormEvent) => {
@@ -1974,6 +1982,18 @@ function FoodForm({
       onSaved();
     } catch (ex) {
       setError(ex instanceof Error ? ex.message : "Could not save food");
+    }
+  };
+  const remove = async () => {
+    if (!food) return;
+    try {
+      const recipe = await db.recipes.filter((item) => item.ingredients.some((ingredient) => ingredient.foodId === food.id)).first();
+      if (recipe) throw new Error(`Remove this food from ${recipe.name} before deleting it`);
+      await db.foods.delete(food.id);
+      onDeleted(food.name);
+    } catch (ex) {
+      setConfirmDelete(false);
+      setError(ex instanceof Error ? ex.message : "Could not delete food");
     }
   };
   return (
@@ -2110,7 +2130,9 @@ function FoodForm({
         <button className="primary full" type="submit">
           Save food
         </button>
+        {food && <button className="danger full saved-food-delete" type="button" onClick={() => setConfirmDelete(true)}><Trash2 />Delete saved food</button>}
       </form>
+      {confirmDelete && food && <div className="dialog-backdrop"><section className="dialog food-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-food-title"><h2 id="delete-food-title">Delete {food.name}?</h2><p>It will disappear from saved foods. Existing day logs and template snapshots will stay unchanged.</p><div><button type="button" onClick={() => setConfirmDelete(false)}>Cancel</button><button className="confirm-food-delete" type="button" onClick={() => void remove()}><Trash2 />Delete food</button></div></section></div>}
     </FormFrame>
   );
 }

@@ -114,4 +114,14 @@ test("per-serving custom food logs and displays as serves", async ({ page }) => 
   await page.getByRole("spinbutton", { name: "Servings / quantity" }).fill("2");
   await page.getByRole("button", { name: "Add food" }).click();
   await expect(page.getByRole("button", { name: "Edit Serving unit test" }).getByText("2 serves")).toBeVisible();
+  await page.getByRole("button", { name: "Food", exact: true }).click();
+  await page.getByPlaceholder("Food name, brand or category").fill("Serving unit test");
+  await page.getByRole("button", { name: "Edit Serving unit test" }).click();
+  await page.getByRole("button", { name: "Delete saved food" }).click();
+  await expect(page.getByRole("dialog", { name: "Delete Serving unit test?" })).toBeVisible();
+  await page.getByRole("button", { name: "Delete food", exact: true }).click();
+  await expect(page.getByText("Serving unit test deleted from saved foods")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit Serving unit test" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("button", { name: "Edit Serving unit test" }).getByText("2 serves")).toBeVisible();
 });
