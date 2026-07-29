@@ -1207,7 +1207,7 @@ function FoodPicker({
             ))}
           </div>
           {!replacing && <div className="food-import-actions" aria-label="Add food from another source">
-            <button onClick={onImport}><ScanBarcode/><span><strong>Scan or search</strong><small>Barcode · branded food</small></span></button>
+            <button onClick={onImport}><ScanBarcode/><span><strong>Scan or search</strong><small>Barcode · branded · fast food</small></span></button>
             <button onClick={onImport}><ImagePlus/><span><strong>Import label</strong><small>Photo · manual review</small></span></button>
           </div>}
           <div className="picker-meta">

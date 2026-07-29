@@ -10,7 +10,7 @@ export interface Nutrients {
   fat: number;
   fibre?: number;
 }
-export type FoodSourceKind = "custom" | "seed" | "fsanz" | "open-food-facts" | "nutrition-label";
+export type FoodSourceKind = "custom" | "seed" | "fsanz" | "open-food-facts" | "nutrition-label" | "restaurant";
 export interface FoodSource {
   kind: FoodSourceKind;
   provider: string;

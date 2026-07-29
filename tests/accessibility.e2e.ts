@@ -55,6 +55,23 @@ test("FSANZ search and label imports require review before saving", async ({ pag
   await expectNoSeriousViolations(page);
 });
 
+test("Australian fast food catalogue finds Chicken Rappa offline and requires review", async ({ page }) => {
+  await page.goto("/#screen=day&date=2026-07-27");
+  await page.getByRole("button", { name: "Food", exact: true }).click();
+  await page.getByRole("button", { name: /Import label/i }).click();
+  await page.getByRole("button", { name: /Australian fast food/i }).click();
+  await expect(page.getByRole("heading", { name: "Australian Fast Food" })).toBeVisible();
+  await page.getByPlaceholder("Restaurant or menu item").fill("Chicken Rappa");
+  const result = page.getByRole("button", { name: /Chicken Rappa.*Oporto.*420 kcal/i }).first();
+  await expect(result).toBeVisible();
+  await result.click();
+  await expect(page.getByLabel("Food name")).toHaveValue("Chicken Rappa");
+  await expect(page.getByLabel("Brand (optional)")).toHaveValue("Oporto");
+  await expect(page.getByRole("spinbutton", { name: "Energy in kilocalories" })).toHaveValue("420");
+  await expect(page.getByRole("button", { name: "Save verified food" })).toBeDisabled();
+  await expectNoSeriousViolations(page);
+});
+
 test("energy unit toggle updates and persists", async ({ page }) => {
   const yesterday = await page.evaluate(() => {
     const date = new Date();

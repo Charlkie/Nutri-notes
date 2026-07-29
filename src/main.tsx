@@ -15,6 +15,7 @@ import "./recipeImport.css";
 import "./importFood.css";
 import "./foodImport.css";
 import "./foodDelete.css";
+import "./restaurantFoods.css";
 import "./foodImportActions.css";
 import "./energy.css";
 import "./energyInput.css";
