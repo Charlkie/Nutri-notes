@@ -36,6 +36,7 @@ import {
 import { seedCategories, seedFoods, seedRecipes } from "./seed";
 import { defaultSettings, validateSettings } from "../domain/settings";
 import { buildLoggedRecipe, recipeSnapshot } from "../domain/recipes";
+import { isLegacyServingUnit } from "../domain/foodUnits";
 
 export class NutritionDB extends Dexie {
   foods!: EntityTable<Food, "id">;
@@ -220,6 +221,35 @@ export class NutritionDB extends Dexie {
         await tx.table("settings").put({
           key: "app",
           value: { ...defaultSettings, ...stored?.value, energyUnit: stored?.value?.energyUnit ?? "kcal" },
+        });
+      });
+    this.version(12)
+      .stores({
+        foods: "id, name, categoryId, lastLoggedAt, logCount, updatedAt, barcode",
+        catalogFoods: "id, name, categoryId, barcode, source.externalId",
+        categories: "id, sortIndex",
+        days: "id, &date, updatedAt, scheduleId",
+        entries: "id, dayId, [dayId+sortIndex], consumed",
+        templates: "id, name, updatedAt",
+        schedules: "id, templateId, start, updatedAt",
+        recipes: "id, name, categoryId, updatedAt",
+        weights: "id, date",
+        settings: "key",
+      })
+      .upgrade(async (tx) => {
+        await tx.table("foods").toCollection().modify((food: Food) => {
+          if (isLegacyServingUnit(food.calculationMode, food.baseQuantity, food.baseUnit)) food.baseUnit = "serving";
+        });
+        await tx.table("entries").toCollection().modify((entry: DayFoodEntry) => {
+          if (isLegacyServingUnit(entry.snapshot.calculationMode, entry.snapshot.baseQuantity, entry.snapshot.unit)) entry.snapshot.unit = "serving";
+          entry.recipe?.ingredients.forEach((ingredient) => {
+            if (isLegacyServingUnit(ingredient.snapshot.calculationMode, ingredient.snapshot.baseQuantity, ingredient.snapshot.unit)) ingredient.snapshot.unit = "serving";
+          });
+        });
+        await tx.table("templates").toCollection().modify((template: DietTemplate) => {
+          template.items.forEach((item) => {
+            if (isLegacyServingUnit(item.snapshot.calculationMode, item.snapshot.baseQuantity, item.snapshot.unit)) item.snapshot.unit = "serving";
+          });
         });
       });
     this.on("populate", async () => {

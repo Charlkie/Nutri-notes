@@ -133,6 +133,8 @@ import {
 import { defaultSettings } from "./domain/settings";
 import { scheduledTemplateDates } from "./domain/templates";
 import { energyValue } from "./domain/energy";
+import { per100Units, servingUnits, unitForMode } from "./domain/foodUnits";
+import { foodUnitLabel, formatFoodQuantity } from "./domain/foodQuantity";
 import { EnergyDisplayProvider, EnergyText, useEnergyDisplay } from "./energyDisplay";
 import { EnergyInput } from "./energyInput";
 import {
@@ -184,7 +186,6 @@ type Toast = {
   message: string;
   undo?: () => Promise<void>;
 };
-const units: FoodUnit[] = ["g", "ml", "serving", "slice", "item", "scoop"];
 function dateLabel(date: Date) {
   const today = new Date();
   if (isSameDay(date, today)) return "Today";
@@ -861,7 +862,7 @@ function SortableFoodCard({
           )}
           <span className="card-metrics">
             <b>
-              {entry.snapshot.quantity} <em>{entry.snapshot.unit}</em>
+              {entry.snapshot.quantity}{" "}<em>{foodUnitLabel(entry.snapshot.quantity, entry.snapshot.unit)}</em>
             </b>
             <b>
               <EnergyText calories={entry.snapshot.calories} />
@@ -1870,7 +1871,7 @@ function SortableTemplateItem({
       <span>
         <strong>{item.snapshot.name}</strong>
         <small>
-          {item.snapshot.quantity} {item.snapshot.unit} ·{" "}
+          {formatFoodQuantity(item.snapshot.quantity, item.snapshot.unit)} ·{" "}
           <EnergyText calories={item.snapshot.calories} />
         </small>
       </span>
@@ -1901,7 +1902,7 @@ function FoodForm({
     categoryId: food?.categoryId ?? categories[0]?.id ?? "other",
     calculationMode: food?.calculationMode ?? "per100",
     baseQuantity: String(food?.baseQuantity ?? 100),
-    baseUnit: food?.baseUnit ?? "g",
+    baseUnit: food ? unitForMode(food.calculationMode, food.baseUnit) : "g",
     calories: String(food?.calories ?? ""),
     protein: String(food?.protein ?? ""),
     carbohydrates: String(food?.carbohydrates ?? ""),
@@ -2023,6 +2024,7 @@ function FoodForm({
                     ...v,
                     calculationMode: "per100",
                     baseQuantity: "100",
+                    baseUnit: unitForMode("per100", v.baseUnit as FoodUnit),
                   }))
                 }
               />{" "}
@@ -2037,6 +2039,7 @@ function FoodForm({
                     ...v,
                     calculationMode: "perServing",
                     baseQuantity: "1",
+                    baseUnit: unitForMode("perServing", v.baseUnit as FoodUnit),
                   }))
                 }
               />{" "}
@@ -2056,7 +2059,7 @@ function FoodForm({
               value={values.baseUnit}
               onChange={(e) => set("baseUnit", e.target.value)}
             >
-              {units.map((u) => (
+              {(values.calculationMode === "perServing" ? servingUnits : per100Units).map((u) => (
                 <option key={u}>{u}</option>
               ))}
             </select>
@@ -2670,7 +2673,7 @@ function CalendarScreen({
                     <span>
                       <strong>{entry.snapshot.name}</strong>
                       <small>
-                        {entry.snapshot.quantity} {entry.snapshot.unit}
+                        {formatFoodQuantity(entry.snapshot.quantity, entry.snapshot.unit)}
                       </small>
                     </span>
                     <b><EnergyText calories={entry.snapshot.calories} /></b>
