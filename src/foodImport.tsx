@@ -45,10 +45,19 @@ export function FoodImportTools({ categories, onClose, onSaved }: { categories: 
 }
 
 async function fetchBarcode(code: string): Promise<FoodDraft> {
-  const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=code,product_name,product_name_en,brands,nutriments,serving_size,product_quantity_unit`);
-  if (!response.ok) throw new Error("The branded-food service could not be reached");
+  let response: Response;
+  try {
+    response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=code,product_name,product_name_en,brands,nutriments,serving_size,product_quantity_unit`);
+  } catch {
+    throw new Error("The branded-food service could not be reached. Check your connection and try again.");
+  }
+  if (response.status === 404)
+    throw new Error("This barcode is not in Open Food Facts yet. Import the nutrition label or create the food manually.");
+  if (!response.ok)
+    throw new Error(`The branded-food service returned an error (${response.status}). Try again shortly.`);
   const data = await response.json() as { status?: number; product?: Record<string, unknown> };
-  if (data.status !== 1 || !data.product) throw new Error("No product was found for that barcode");
+  if (data.status !== 1 || !data.product)
+    throw new Error("This barcode is not in Open Food Facts yet. Import the nutrition label or create the food manually.");
   return openFoodFactsProductToDraft(data.product, code);
 }
 

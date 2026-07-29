@@ -123,6 +123,18 @@ test("FSANZ search and label imports require review before saving", async ({ pag
   await expectNoSeriousViolations(page);
 });
 
+test("an unknown barcode is distinguished from a provider outage",async({page})=>{
+  await page.route("https://world.openfoodfacts.org/api/v2/product/**",route=>route.fulfill({status:404,contentType:"application/json",body:JSON.stringify({status:0,status_verbose:"product not found"})}));
+  await page.goto("/#screen=day&date=2026-07-27");
+  await page.getByRole("button",{name:"Food",exact:true}).click();
+  await page.getByRole("button",{name:/Scan or search/i}).click();
+  await page.getByRole("button",{name:/Scan a barcode/i}).click();
+  await page.getByLabel("Barcode",{exact:true}).fill("9300000000000");
+  await page.getByRole("button",{name:"Look up product"}).click();
+  await expect(page.getByRole("alert")).toContainText("not in Open Food Facts yet");
+  await expect(page.getByRole("alert")).not.toContainText("could not be reached");
+});
+
 test("Australian generic search understands common food names and aliases", async ({ page }) => {
   await page.goto("/#screen=day&date=2026-07-27");
   await page.getByRole("button", { name: "Food", exact: true }).click();
