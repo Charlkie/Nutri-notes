@@ -35,7 +35,9 @@ test("food and recipe picker has labelled, accessible controls", async ({ page }
   const recipeName = page.getByLabel("Recipe name");
   await expect(recipeName).not.toBeFocused();
   await expect(recipeName).toHaveCSS("font-size", "16px");
-  await page.getByRole("button", { name: /Add a saved food/i }).click();
+  await expect(page.getByRole("button", { name: "Add ingredient", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /Create a new ingredient food/i })).toHaveCount(0);
+  await page.getByRole("button", { name: "Add ingredient", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Choose Ingredient" })).toBeVisible();
   await expect(page.getByRole("group", { name: "Filter by category" })).toBeVisible();
   await page.getByPlaceholder("Food name, brand or category").fill("Quick oats");

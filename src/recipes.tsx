@@ -3,7 +3,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowDown, ArrowUp, Check, ChevronRight, Copy, GripVertical, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Copy, GripVertical, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { addRecipeToDay, db, id, updateLoggedRecipeEntry } from "./data/db";
 import { recipeIngredientsFromLogged, recipeSnapshot, scaleLoggedRecipe } from "./domain/recipes";
 import { createSnapshot, roundMacro } from "./domain/nutrition";
@@ -110,8 +110,7 @@ function RecipeBuilder({ recipe, foods, categories, onClose }: {
       <div className="recipe-fields"><label>Recipe name<input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Spaghetti bolognese"/></label><div><label>Category<select value={categoryId} onChange={e => setCategoryId(e.target.value)}>{categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label>Recipe yield<input type="number" min="0.1" step="0.1" inputMode="decimal" value={yieldServings} onChange={e => setYieldServings(e.target.value)}/><small>servings</small></label></div></div>
       <div className="ingredient-heading"><strong>Ingredients</strong><span>{ingredients.length}</span></div>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={({active})=>setSelectedId(String(active.id))} onDragEnd={dragEnd}><SortableContext items={ingredients.map(item=>item.id)} strategy={verticalListSortingStrategy}><div className="recipe-ingredients">{ingredients.map((item,index)=>{const food=foods.find(candidate=>candidate.id===item.foodId);return <SavedIngredientRow key={item.id} item={item} food={food} editing={selectedId!==undefined} selected={selectedId===item.id} categoryColour={categories.find(category=>category.id===food?.categoryId)?.colour} onSelect={()=>setSelectedId(item.id)} onQuantity={value=>setIngredients(current=>current.map((ingredient,i)=>i===index?{...ingredient,quantity:value}:ingredient))} onGroup={group=>setIngredients(current=>current.map((ingredient,i)=>i===index?{...ingredient,group}:ingredient))}/>})}</div></SortableContext></DndContext>
-      <button className="recipe-food-search recipe-food-launch" onClick={()=>setChoosingFood(true)}><Search /><span>Add a saved food…</span><ChevronRight /></button>
-      <button className="inline-food-action" onClick={()=>setCustomFood(true)}><Plus />Create a new ingredient food</button>
+      <button className="add-another recipe-add-ingredient" onClick={()=>setChoosingFood(true)}><Plus />Add ingredient</button>
       <label className="recipe-instructions">Preparation steps <small>One step per line</small><textarea rows={4} value={instructions} onChange={e=>setInstructions(e.target.value)} placeholder={"Cook the pasta.\nPrepare the sauce.\nCombine and serve."}/></label>
       <label className="recipe-notes">Notes (optional)<textarea rows={2} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Substitutions, storage, or serving notes"/></label>
       {recipe&&<div className="recipe-record-actions"><button onClick={()=>void duplicate()}><Copy />Duplicate recipe</button><button className="danger" onClick={async()=>{await db.recipes.delete(recipe.id);onClose()}}><Trash2 />Delete recipe</button></div>}
