@@ -222,13 +222,19 @@ export default function App() {
   const [toast, setToast] = useState<Toast>();
   const [dbError, setDbError] = useState<string>();
   const appShellRef = useRef<HTMLDivElement>(null);
+  const dayTrackRef = useRef<HTMLDivElement>(null);
   const routeRef = useRef(route);
+  const dayTransitioning = useRef(false);
   const suppressSwipeClickUntil = useRef(0);
   const suppressSwipeClickTarget = useRef<Element>();
   const dropbox = useDropboxBackup();
   const googleDrive = useGoogleDriveBackup(route === "settings");
   const date = isoDate(selectedDate);
   const data = useDay(date);
+  const previousDate = isoDate(subDays(selectedDate, 1));
+  const nextDate = isoDate(addDays(selectedDate, 1));
+  const previousData = useDay(previousDate);
+  const nextData = useDay(nextDate);
   routeRef.current = route;
   const categories =
     useLiveQuery(() => db.categories.orderBy("sortIndex").toArray(), []) ?? [];
@@ -287,7 +293,7 @@ export default function App() {
     let swipe: { x:number; y:number; startedAt:number; onCard:boolean; target:Element } | undefined;
     const excluded = "input, textarea, select, [role='slider'], [data-no-screen-swipe], .chips, .period-tabs, .trend-metrics, .drag-handle, .ingredient-grip, .template-grip";
     const start = (event:TouchEvent) => {
-      if (routeRef.current !== "day" || event.touches.length !== 1) return;
+      if (routeRef.current !== "day" || event.touches.length !== 1 || dayTransitioning.current) return;
       const target = event.target as Element;
       if (target.closest(excluded)) return;
       const touch = event.touches[0]!;
@@ -299,23 +305,59 @@ export default function App() {
       const dx = touch.clientX - swipe.x;
       const dy = touch.clientY - swipe.y;
       const heldCard = swipe.onCard && performance.now() - swipe.startedAt > 300;
-      if (!heldCard && Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.2) event.preventDefault();
+      if (!heldCard && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy) * 1.15) {
+        event.preventDefault();
+        const width = shell.clientWidth;
+        const resisted = Math.sign(dx) * Math.min(Math.abs(dx), width);
+        dayTrackRef.current?.style.setProperty("--day-drag", `${resisted}px`);
+      }
     };
     const end = (event:TouchEvent) => {
       const started = swipe;
       swipe = undefined;
       const touch = event.changedTouches[0];
-      if (!started || !touch || routeRef.current !== "day") return;
+      const track = dayTrackRef.current;
+      if (!started || !touch || routeRef.current !== "day" || !track) return;
       const dx = touch.clientX - started.x;
       const dy = touch.clientY - started.y;
       const duration = performance.now() - started.startedAt;
-      if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.35 || duration > 750 || (started.onCard && duration > 300)) return;
-      event.preventDefault();
-      suppressSwipeClickUntil.current = performance.now() + 450;
-      suppressSwipeClickTarget.current = started.target;
-      setSelectedDate(current => addDays(current, dx < 0 ? 1 : -1));
+      const width = shell.clientWidth;
+      const horizontal = Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy) * 1.15;
+      const heldCard = started.onCard && duration > 300;
+      const velocity = Math.abs(dx) / Math.max(duration, 1);
+      const changeDay = horizontal && !heldCard && (Math.abs(dx) > width * .28 || velocity > .5);
+      const destination = changeDay ? Math.sign(dx) * width : 0;
+      if (horizontal && !heldCard) {
+        event.preventDefault();
+        suppressSwipeClickUntil.current = performance.now() + 450;
+        suppressSwipeClickTarget.current = started.target;
+      }
+      track.style.transition = "transform 260ms cubic-bezier(.22,.8,.24,1)";
+      track.style.setProperty("--day-drag", `${destination}px`);
+      if (!changeDay) {
+        window.setTimeout(() => { track.style.transition = ""; }, 270);
+        return;
+      }
+      dayTransitioning.current = true;
+      window.setTimeout(() => {
+        setSelectedDate(current => addDays(current, dx < 0 ? 1 : -1));
+        track.style.transition = "none";
+        track.style.setProperty("--day-drag", "0px");
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          track.style.transition = "";
+          dayTransitioning.current = false;
+        }));
+      }, 260);
     };
-    const cancel = () => { swipe = undefined; };
+    const cancel = () => {
+      swipe = undefined;
+      const track = dayTrackRef.current;
+      if (track) {
+        track.style.transition = "transform 220ms ease-out";
+        track.style.setProperty("--day-drag", "0px");
+        window.setTimeout(() => { track.style.transition = ""; }, 230);
+      }
+    };
     shell.addEventListener("touchstart", start, { passive:true });
     shell.addEventListener("touchmove", move, { passive:false });
     shell.addEventListener("touchend", end, { passive:false });
@@ -340,6 +382,32 @@ export default function App() {
     event.preventDefault();
     input.value="";
   };
+  const renderDay = (
+    dayDate: ISODate,
+    dayValue: Date,
+    dayData: ReturnType<typeof useDay>,
+  ) => (
+    <DayScreen
+      date={dayDate}
+      selectedDate={dayValue}
+      data={dayData}
+      categories={categories}
+      settings={appSettings}
+      onMoveDate={setSelectedDate}
+      onPick={() => { setPickerTab("foods"); setRoute("picker"); }}
+      onTemplates={() => { setPickerTab("templates"); setRoute("picker"); }}
+      onCopy={async () => {
+        const count = await copyPreviousDay(dayDate, appSettings.copyConsumedState === "preserve");
+        setToast({ message:count ? `Copied ${count} foods` : "No previous day to copy" });
+      }}
+      onEdit={(entry) => {
+        setEditingFood(undefined);
+        setEditingEntry(entry);
+        setRoute(entry.recipe ? "recipeEntry" : "entryForm");
+      }}
+      onToast={setToast}
+    />
+  );
   if (dbError)
     return (
       <main className="fatal">
@@ -360,39 +428,19 @@ export default function App() {
     <div ref={appShellRef} className="app-shell" onKeyDownCapture={clearZeroForEditing} onBeforeInputCapture={clearZeroBeforeInput} onClickCapture={event=>{const target=event.target as Node;const swiped=suppressSwipeClickTarget.current;if(performance.now()<suppressSwipeClickUntil.current&&swiped&&(swiped===target||swiped.contains(target))){event.preventDefault();event.stopPropagation();suppressSwipeClickTarget.current=undefined}}}>
       {isPrimaryRoute(route) && (
         <div className="tracking-layer" aria-hidden={route!=="day"||undefined} ref={element=>{if(element)element.inert=route!=="day"}}>
-        <DayScreen
-          date={date}
-          selectedDate={selectedDate}
-          data={data}
-          categories={categories}
-          settings={appSettings}
-          onMoveDate={(d) => setSelectedDate(d)}
-          onPick={() => {
-            setPickerTab("foods");
-            setRoute("picker");
-          }}
-          onTemplates={() => {
-            setPickerTab("templates");
-            setRoute("picker");
-          }}
-          onCopy={async () => {
-            const count = await copyPreviousDay(
-              date,
-              appSettings.copyConsumedState === "preserve",
-            );
-            setToast({
-              message: count
-                ? `Copied ${count} foods`
-                : "No previous day to copy",
-            });
-          }}
-          onEdit={(e) => {
-            setEditingFood(undefined);
-            setEditingEntry(e);
-            setRoute(e.recipe ? "recipeEntry" : "entryForm");
-          }}
-          onToast={setToast}
-        />
+          <div className="day-carousel">
+            <div ref={dayTrackRef} className="day-carousel-track">
+              <div className="day-carousel-panel" aria-hidden="true" ref={element=>{if(element)element.inert=true}}>
+                {renderDay(previousDate, subDays(selectedDate, 1), previousData)}
+              </div>
+              <div className="day-carousel-panel">
+                {renderDay(date, selectedDate, data)}
+              </div>
+              <div className="day-carousel-panel" aria-hidden="true" ref={element=>{if(element)element.inert=true}}>
+                {renderDay(nextDate, addDays(selectedDate, 1), nextData)}
+              </div>
+            </div>
+          </div>
         </div>
       )}
       {route === "picker" && (
@@ -601,6 +649,7 @@ function DayScreen({
   const [templateName, setTemplateName] = useState("");
   const [nameConflict, setNameConflict] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(()=>new Set());
+  useEffect(() => setSelectedIds(new Set()), [date]);
   const sensors = useSensors(
     useSensor(TouchSensor, {
       activationConstraint: { distance: 4 },

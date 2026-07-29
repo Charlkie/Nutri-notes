@@ -39,7 +39,7 @@ async function longPressTouch(page:Page,target:Locator){
 test("primary screens have no serious automated accessibility violations", async ({ page }) => {
   for (const screen of ["day", "body", "calendar", "charts", "settings"] as const) {
     await page.goto(`/#screen=${screen}&date=2026-07-27`);
-    await (screen==="day"?page.locator(".day-screen"):page.locator(".auxiliary-overlay > main")).waitFor();
+    await (screen==="day"?page.locator(".day-carousel-panel:not([aria-hidden]) .day-screen"):page.locator(".auxiliary-overlay > main")).waitFor();
     if (screen === "settings")
       await Promise.all([
         expect(
@@ -54,13 +54,20 @@ test("primary screens have no serious automated accessibility violations", async
 test("horizontal swipes change days and secondary screens minimise to the tracker",async({page})=>{
   await page.goto("/#screen=day&date=2026-07-27");
   await expect(page.getByText("27 July 2026",{exact:true})).toBeVisible();
-  await swipeScreen(page,{x:330,y:430},{x:80,y:430});
+  const track=page.locator(".day-carousel-track");
+  const session=await page.context().newCDPSession(page);
+  await session.send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[{x:330,y:430}]});
+  await session.send("Input.dispatchTouchEvent",{type:"touchMove",touchPoints:[{x:195,y:430}]});
+  await expect.poll(()=>track.evaluate(element=>getComputedStyle(element).transform)).not.toBe("none");
+  await expect(track).toHaveCSS("--day-drag","-135px");
+  await session.send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});
+  await session.detach();
   await expect(page.getByText("28 July 2026",{exact:true})).toBeVisible();
   await swipeScreen(page,{x:20,y:430},{x:300,y:430});
   await expect(page.getByText("27 July 2026",{exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Body",exact:true}).click();
   await expect(page.getByRole("button",{name:"Minimise Body"})).toBeVisible();
-  await expect(page.locator(".day-screen")).toHaveCount(1);
+  await expect(page.locator(".day-carousel-panel:not([aria-hidden]) .day-screen")).toHaveCount(1);
   await page.getByRole("button",{name:"Minimise Body"}).click();
   await expect(page.getByRole("button",{name:"Minimise Body"})).toHaveCount(0);
 });
@@ -153,17 +160,18 @@ test("long-press edit mode supports selecting and deleting multiple entries",asy
     await page.getByRole("button",{name:"Log",exact:true}).first().click();
     await page.getByRole("button",{name:"Log recipe"}).click();
   }
-  const cards=page.locator(".food-card .card-main");
+  const currentPanel=page.locator(".day-carousel-panel:not([aria-hidden])");
+  const cards=currentPanel.locator(".food-card .card-main");
   await expect(cards).toHaveCount(2);
   await longPressTouch(page,cards.first());
   await expect(page.getByRole("toolbar",{name:"Edit 1 selected entry"})).toBeVisible();
   await tapTouch(page,page.getByRole("button",{name:"Select Beef Rice Bowl",exact:true}));
   await expect(page.getByRole("toolbar",{name:"Edit 2 selected entries"})).toBeVisible();
   await page.getByRole("button",{name:"Delete 2"}).click();
-  await expect(page.locator(".food-card")).toHaveCount(0);
+  await expect(currentPanel.locator(".food-card")).toHaveCount(0);
   await expect(page.getByText("2 entries deleted")).toBeVisible();
   await page.getByRole("button",{name:"Undo"}).click();
-  await expect(page.locator(".food-card")).toHaveCount(2);
+  await expect(currentPanel.locator(".food-card")).toHaveCount(2);
 });
 
 test("convert-day dialog opens without focusing or zooming its name field",async({page})=>{

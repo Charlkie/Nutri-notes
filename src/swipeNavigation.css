@@ -1,1 +1,1 @@
-.app-shell{touch-action:pan-y}
+.app-shell{touch-action:pan-y}.tracking-layer{overflow:hidden}.day-carousel{width:100%;overflow:hidden}.day-carousel-track{--day-drag:0px;width:300%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));transform:translate3d(calc(-33.333333% + var(--day-drag)),0,0);will-change:transform}.day-carousel-panel{width:100%;min-width:0}.day-carousel-panel>.day-screen{width:100%}
