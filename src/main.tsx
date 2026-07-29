@@ -5,6 +5,7 @@ import "./styles.css";
 import "./milestone.css";
 import "./calendar.css";
 import "./body.css";
+import "./weightEditor.css";
 import "./charts.css";
 import "./settings.css";
 import "./preferences.css";

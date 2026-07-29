@@ -90,3 +90,12 @@ test("custom food energy can be entered in kcal or kJ", async ({ page }) => {
   await expect(page.getByRole("spinbutton", { name: "Energy in kilocalories" })).toHaveValue("200");
   await expectNoSeriousViolations(page);
 });
+
+test("add weight opens without focusing or zooming the numeric field", async ({ page }) => {
+  await page.goto("/#screen=body&date=2026-07-27");
+  await page.getByRole("button", { name: "Add weight" }).click();
+  const weight = page.getByRole("spinbutton", { name: /Weight/ });
+  await expect(weight).toBeVisible();
+  await expect(weight).not.toBeFocused();
+  await expect(weight).toHaveCSS("font-size", "16px");
+});

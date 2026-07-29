@@ -2949,7 +2949,6 @@ function WeightEditor({
             step="0.1"
             value={weight}
             onChange={(e) => setWeight(e.target.value)}
-            autoFocus
           />
         </label>
         <label>
