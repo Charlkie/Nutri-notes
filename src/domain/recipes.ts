@@ -1,4 +1,4 @@
-import type { Food, FoodSnapshot, LoggedRecipe, Nutrients, Recipe } from "./types";
+import type { DayFoodEntry, Food, FoodSnapshot, LoggedRecipe, Nutrients, Recipe } from "./types";
 import { createSnapshot, emptyNutrients } from "./nutrition";
 import { createId } from "./id";
 
@@ -34,4 +34,8 @@ export function moveRecipeItem<T>(items:readonly T[],index:number,offset:-1|1):T
   const [item]=reordered.splice(index,1);
   reordered.splice(target,0,item!);
   return reordered;
+}
+
+export function renameLoggedRecipeEntries(entries:readonly DayFoodEntry[],recipeId:string,name:string,updatedAt:string):DayFoodEntry[]{
+  return entries.map(entry=>entry.recipe?.recipeId===recipeId?{...entry,snapshot:{...entry.snapshot,name},updatedAt}:entry);
 }

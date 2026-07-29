@@ -35,7 +35,7 @@ import {
 } from "../domain/portability";
 import { seedCategories, seedFoods, seedRecipes } from "./seed";
 import { defaultSettings, validateSettings } from "../domain/settings";
-import { buildLoggedRecipe, recipeSnapshot } from "../domain/recipes";
+import { buildLoggedRecipe, recipeSnapshot, renameLoggedRecipeEntries } from "../domain/recipes";
 import { isLegacyServingUnit } from "../domain/foodUnits";
 
 export class NutritionDB extends Dexie {
@@ -357,6 +357,17 @@ export async function addRecipeToDay(
     };
     await db.entries.add(entry);
     return entry;
+  });
+}
+
+export async function saveRecipe(recipe:Recipe):Promise<void>{
+  await db.transaction("rw",db.recipes,db.entries,async()=>{
+    const previous=await db.recipes.get(recipe.id);
+    await db.recipes.put(recipe);
+    if(previous&&previous.name!==recipe.name){
+      const logged=await db.entries.filter(entry=>entry.recipe?.recipeId===recipe.id).toArray();
+      if(logged.length)await db.entries.bulkPut(renameLoggedRecipeEntries(logged,recipe.id,recipe.name,recipe.updatedAt));
+    }
   });
 }
 

@@ -4,7 +4,7 @@ import { DndContext, KeyboardSensor, PointerSensor, TouchSensor, closestCenter, 
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowDown, ArrowUp, Check, Copy, GripVertical, Pencil, Plus, Search, Trash2, X } from "lucide-react";
-import { addRecipeToDay, db, id, updateLoggedRecipeEntry } from "./data/db";
+import { addRecipeToDay, db, id, saveRecipe, updateLoggedRecipeEntry } from "./data/db";
 import { recipeIngredientsFromLogged, recipeSnapshot, scaleLoggedRecipe } from "./domain/recipes";
 import { createSnapshot, roundMacro } from "./domain/nutrition";
 import { EnergyText } from "./energyDisplay";
@@ -95,7 +95,7 @@ function RecipeBuilder({ recipe, foods, categories, onClose }: {
             throw new Error("Ingredient quantities must be greater than zero");
         const now = new Date().toISOString();
         const steps = instructions.split("\n").map(step => step.trim()).filter(Boolean);
-        await db.recipes.put({ id: recipe?.id ?? id(), name: name.trim(), categoryId, yieldServings: servings, ingredients: ingredients.map((item, sortIndex) => ({ ...item, group: item.group?.trim() || undefined, sortIndex })), instructions: steps.length ? steps : undefined, notes: notes.trim() || undefined, createdAt: recipe?.createdAt ?? now, updatedAt: now });
+        await saveRecipe({ id: recipe?.id ?? id(), name: name.trim(), categoryId, yieldServings: servings, ingredients: ingredients.map((item, sortIndex) => ({ ...item, group: item.group?.trim() || undefined, sortIndex })), instructions: steps.length ? steps : undefined, notes: notes.trim() || undefined, createdAt: recipe?.createdAt ?? now, updatedAt: now });
         onClose();
     }
     catch (ex) {
