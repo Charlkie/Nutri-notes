@@ -56,7 +56,15 @@ test("FSANZ search and label imports require review before saving", async ({ pag
 });
 
 test("energy unit toggle updates and persists", async ({ page }) => {
-  await page.goto("/#screen=day&date=2026-07-27");
+  const yesterday = await page.evaluate(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 1);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  });
+  await page.goto(`/#screen=day&date=${yesterday}`);
   const kcal = page.getByRole("button", { name: /Energy shown in kilocalories/i });
   await expect(kcal).toBeVisible();
   await kcal.click();
@@ -64,4 +72,21 @@ test("energy unit toggle updates and persists", async ({ page }) => {
   await expect(page.getByText(/kJ/).first()).toBeVisible();
   await page.reload();
   await expect(page.getByRole("button", { name: /Energy shown in kilojoules/i })).toBeVisible();
+});
+
+test("custom food energy can be entered in kcal or kJ", async ({ page }) => {
+  await page.goto("/#screen=day&date=2026-07-27");
+  await page.getByRole("button", { name: "Food", exact: true }).click();
+  await page.getByRole("button", { name: "Add custom food" }).click();
+
+  const energy = page.getByRole("spinbutton", { name: "Energy in kilocalories" });
+  await energy.fill("100");
+  const units = page.getByRole("group", { name: "Energy unit" });
+  await units.getByRole("button", { name: "kJ", exact: true }).click();
+  const kilojoules = page.getByRole("spinbutton", { name: "Energy in kilojoules" });
+  await expect(kilojoules).toHaveValue("418.4");
+  await kilojoules.fill("836.8");
+  await units.getByRole("button", { name: "kcal", exact: true }).click();
+  await expect(page.getByRole("spinbutton", { name: "Energy in kilocalories" })).toHaveValue("200");
+  await expectNoSeriousViolations(page);
 });

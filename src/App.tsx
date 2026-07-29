@@ -134,6 +134,7 @@ import { defaultSettings } from "./domain/settings";
 import { scheduledTemplateDates } from "./domain/templates";
 import { energyValue } from "./domain/energy";
 import { EnergyDisplayProvider, EnergyText, useEnergyDisplay } from "./energyDisplay";
+import { EnergyInput } from "./energyInput";
 import {
   isPrimaryRoute,
   navigationHash,
@@ -1926,7 +1927,7 @@ function FoodForm({
       nums.forEach((n, i) =>
         assertNonNegative(
           n,
-          ["Base quantity", "Calories", "Protein", "Carbohydrates", "Fat"][i] ??
+          ["Base quantity", "Energy", "Protein", "Carbohydrates", "Fat"][i] ??
             "Value",
         ),
       );
@@ -2062,10 +2063,10 @@ function FoodForm({
           </Field>
         </div>
         <div className="form-grid">
-          <Field label="Calories">
-            <NumberInput
-              value={values.calories}
-              onChange={(v) => set("calories", v)}
+          <Field label="Energy">
+            <EnergyInput
+              calories={values.calories === "" ? undefined : Number(values.calories)}
+              onCaloriesChange={(value) => set("calories", value === undefined ? "" : String(value))}
             />
           </Field>
           <Field label="Protein (g)">
