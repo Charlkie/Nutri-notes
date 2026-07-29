@@ -1186,7 +1186,7 @@ function FoodPicker({
               placeholder="Food name, brand or category"
             />
           </label>
-          <div className="chips" aria-label="Filter by category">
+          <div className="chips" role="group" aria-label="Filter by category">
             <button
               className={!category ? "selected" : ""}
               onClick={() => setCategory(undefined)}

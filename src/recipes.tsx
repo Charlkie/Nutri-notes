@@ -45,6 +45,24 @@ export function RecipePanel({ date, foods, categories, onLogged }: {
       {logging&&<div className="dialog-backdrop"><div className="dialog recipe-log-dialog" role="dialog" aria-modal="true"><h2>Log {logging.name}</h2><p>This recipe makes {logging.yieldServings} servings. Ingredient quantities will scale to what you log.</p>{error&&<p className="form-error" role="alert">{error}</p>}<label>Servings<input type="number" min="0.1" step="0.1" inputMode="decimal" value={servings} onChange={e=>setServings(e.target.value)} autoFocus/></label><div><button onClick={()=>setLogging(undefined)}>Cancel</button><button className="primary" onClick={()=>void log()}>Log recipe</button></div></div></div>}
     </section>;
 }
+function RecipeIngredientPicker({categories,excludedIds,onClose,onSelected,onCustom}:{categories:FoodCategory[];excludedIds:string[];onClose:()=>void;onSelected:(food:Food)=>void;onCustom:()=>void}) {
+  const foods=useLiveQuery(()=>db.foods.toArray(),[])??[];
+  const catalogFoods=useLiveQuery(()=>db.catalogFoods.toArray(),[])??[];
+  const [query,setQuery]=useState("");
+  const [category,setCategory]=useState<string>();
+  const excluded=new Set(excludedIds);
+  const savedIds=new Set(foods.map(food=>food.id));
+  const visible=useMemo(()=>[...foods,...(query.trim().length>=2?catalogFoods.filter(food=>!savedIds.has(food.id)):[])].filter(food=>!excluded.has(food.id)&&(!category||food.categoryId===category)&&`${food.name} ${food.brand??""} ${food.notes??""} ${categories.find(item=>item.id===food.categoryId)?.name??""}`.toLowerCase().includes(query.toLowerCase())).sort((a,b)=>(b.lastLoggedAt??"").localeCompare(a.lastLoggedAt??"")||b.logCount-a.logCount||a.name.localeCompare(b.name)),[foods,catalogFoods,query,category,categories,excludedIds.join("|")]);
+  const choose=async(food:Food)=>{if(!savedIds.has(food.id))await db.foods.put(food);onSelected(food)};
+  return <main className="screen picker-screen recipe-ingredient-picker">
+    <header className="modal-header"><button className="icon-button close" onClick={onClose} aria-label="Close ingredient picker"><X/></button><h1>Choose Ingredient</h1><button className="icon-button add" onClick={onCustom} aria-label="Add custom ingredient food"><Plus/></button></header>
+    <label className="search"><Search/><span className="sr-only">Search foods</span><input type="search" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Food name, brand or category"/></label>
+    <div className="chips" role="group" aria-label="Filter by category"><button className={!category?"selected":""} onClick={()=>setCategory(undefined)}>All</button>{categories.map(item=><button key={item.id} className={category===item.id?"selected":""} onClick={()=>setCategory(category===item.id?undefined:item.id)}><i style={{background:item.colour}}/>{item.name}</button>)}</div>
+    <div className="picker-meta"><span>{visible.length} foods</span><span>{query.trim().length<2?"Type 2+ letters to search FSANZ":"Local · FSANZ · A–Z"}</span></div>
+    <section className="food-list">{visible.map(food=>{const cat=categories.find(item=>item.id===food.categoryId);return <div className="food-row recipe-food-choice" key={food.id}><button className="food-select" onClick={()=>void choose(food)}><i style={{background:cat?.colour}}/><span><strong>{food.name}</strong><small>{food.brand?`${food.brand} · `:""}{food.source?.kind==="fsanz"?`FSANZ ${food.source.datasetVersion}`:food.logCount?`${food.logCount} logs`:"Never logged"}</small></span><b>{food.calculationMode==="per100"?`100 ${food.baseUnit}`:food.servingDescription??`1 ${food.baseUnit}`}<small><EnergyText calories={food.calories}/></small></b></button></div>})}{!visible.length&&<p className="no-results">No matching unused foods.</p>}</section>
+    <button className="floating-add" onClick={onCustom}><Plus/>Custom food</button>
+  </main>;
+}
 function RecipeBuilder({ recipe, foods, categories, onClose }: {
     recipe?: Recipe;
     foods: Food[];
@@ -58,14 +76,13 @@ function RecipeBuilder({ recipe, foods, categories, onClose }: {
     const [instructions, setInstructions] = useState((recipe?.instructions ?? []).join("\n"));
     const [ingredients, setIngredients] = useState(recipe?.ingredients ?? []);
     const [selectedId,setSelectedId]=useState<string>();
-    const [query, setQuery] = useState("");
+    const [choosingFood, setChoosingFood] = useState(false);
     const [error, setError] = useState("");
     const [customFood, setCustomFood] = useState(false);
     const sensors=useSensors(useSensor(TouchSensor,{activationConstraint:{delay:380,tolerance:8}}),useSensor(PointerSensor,{activationConstraint:{delay:350,tolerance:6}}),useSensor(KeyboardSensor,{coordinateGetter:sortableKeyboardCoordinates}));
     const dragEnd=({active,over}:DragEndEvent)=>{if(!over||active.id===over.id)return;setIngredients(current=>{const from=current.findIndex(item=>item.id===active.id);const to=current.findIndex(item=>item.id===over.id);return from<0||to<0?current:arrayMove(current,from,to)})};
     const moveSelected=(offset:-1|1)=>setIngredients(current=>{const from=current.findIndex(item=>item.id===selectedId);const to=from+offset;return from<0||to<0||to>=current.length?current:arrayMove(current,from,to)});
-    const matches = useMemo(() => foods.filter(food => food.name.toLowerCase().includes(query.toLowerCase()) && !ingredients.some(item => item.foodId === food.id)).slice(0, 6), [foods, ingredients, query]);
-    const addIngredient = (food: Food) => { setIngredients(current => [...current, { id: id(), foodId: food.id, quantity: food.baseQuantity, sortIndex: current.length }]); setQuery(""); };
+    const addIngredient = (food: Food) => { setIngredients(current => [...current, { id: id(), foodId: food.id, quantity: food.baseQuantity, sortIndex: current.length }]); };
     const save = async () => { try {
         const servings = Number(yieldServings);
         if (!name.trim())
@@ -86,14 +103,14 @@ function RecipeBuilder({ recipe, foods, categories, onClose }: {
     } };
     const duplicate = async () => { if (!recipe)
         return; const now = new Date().toISOString(); await db.recipes.add({ ...recipe, id: id(), name: `${recipe.name} Copy`, ingredients: recipe.ingredients.map((item, sortIndex) => ({ ...item, id: id(), sortIndex })), instructions: recipe.instructions ? [...recipe.instructions] : undefined, createdAt: now, updatedAt: now }); onClose(); };
+    if (choosingFood) return <><RecipeIngredientPicker categories={categories} excludedIds={ingredients.map(item=>item.foodId)} onClose={()=>setChoosingFood(false)} onSelected={food=>{addIngredient(food);setChoosingFood(false)}} onCustom={()=>setCustomFood(true)}/>{customFood&&<InlineFoodDialog categories={categories} onClose={()=>setCustomFood(false)} onCreated={food=>{addIngredient(food);setCustomFood(false);setChoosingFood(false)}}/>}</>;
     return <section className="recipe-builder">
       <header><button onClick={onClose} aria-label="Back to recipes"><X /></button><div><strong>{recipe ? "Edit recipe" : "New recipe"}</strong><small>Nutrition is calculated from ingredients.</small></div><button onClick={() => void save()} aria-label="Save recipe"><Check /></button></header>
       {error && <p className="form-error" role="alert">{error}</p>}
       <div className="recipe-fields"><label>Recipe name<input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Spaghetti bolognese"/></label><div><label>Category<select value={categoryId} onChange={e => setCategoryId(e.target.value)}>{categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label>Recipe yield<input type="number" min="0.1" step="0.1" inputMode="decimal" value={yieldServings} onChange={e => setYieldServings(e.target.value)}/><small>servings</small></label></div></div>
       <div className="ingredient-heading"><strong>Ingredients</strong><span>{ingredients.length}</span></div>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={({active})=>setSelectedId(String(active.id))} onDragEnd={dragEnd}><SortableContext items={ingredients.map(item=>item.id)} strategy={verticalListSortingStrategy}><div className="recipe-ingredients">{ingredients.map((item,index)=>{const food=foods.find(candidate=>candidate.id===item.foodId);return <SavedIngredientRow key={item.id} item={item} food={food} editing={selectedId!==undefined} selected={selectedId===item.id} categoryColour={categories.find(category=>category.id===food?.categoryId)?.colour} onSelect={()=>setSelectedId(item.id)} onQuantity={value=>setIngredients(current=>current.map((ingredient,i)=>i===index?{...ingredient,quantity:value}:ingredient))} onGroup={group=>setIngredients(current=>current.map((ingredient,i)=>i===index?{...ingredient,group}:ingredient))}/>})}</div></SortableContext></DndContext>
-      <label className="recipe-food-search"><Search /><span className="sr-only">Find ingredient</span><input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Add a saved food…"/></label>
-      {query&&<div className="ingredient-results">{matches.map(food=><button key={food.id} onClick={()=>addIngredient(food)}><Plus /><span><strong>{food.name}</strong><small>{food.baseQuantity} {food.baseUnit}</small></span><ChevronRight /></button>)}{!matches.length&&<p>No matching unused foods.</p>}</div>}
+      <button className="recipe-food-search recipe-food-launch" onClick={()=>setChoosingFood(true)}><Search /><span>Add a saved food…</span><ChevronRight /></button>
       <button className="inline-food-action" onClick={()=>setCustomFood(true)}><Plus />Create a new ingredient food</button>
       <label className="recipe-instructions">Preparation steps <small>One step per line</small><textarea rows={4} value={instructions} onChange={e=>setInstructions(e.target.value)} placeholder={"Cook the pasta.\nPrepare the sauce.\nCombine and serve."}/></label>
       <label className="recipe-notes">Notes (optional)<textarea rows={2} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Substitutions, storage, or serving notes"/></label>
@@ -154,13 +171,11 @@ export function RecipeEntryEditor({ entry, onClose, onSaved, onDelete }: {
     onDelete: (entry: DayFoodEntry) => void;
 }) {
     const saved = useLiveQuery(() => entry.recipe ? db.recipes.get(entry.recipe.recipeId) : undefined, [entry.recipe?.recipeId]);
-    const foods = useLiveQuery(() => db.foods.orderBy("name").toArray(), []) ?? [];
     const categories = useLiveQuery(() => db.categories.orderBy("sortIndex").toArray(), []) ?? [];
     const [logged, setLogged] = useState<LoggedRecipe>(() => structuredClone(entry.recipe!));
     const [consumed, setConsumed] = useState(entry.consumed);
     const [error, setError] = useState("");
     const [adding, setAdding] = useState(false);
-    const [query, setQuery] = useState("");
     const [customFood, setCustomFood] = useState(false);
     const [servings, setServings] = useState(String(entry.recipe!.loggedServings));
     const [saveOptions, setSaveOptions] = useState(false);
@@ -173,8 +188,7 @@ export function RecipeEntryEditor({ entry, onClose, onSaved, onDelete }: {
     const recipeInfo = { id: logged.recipeId, name: saved?.name ?? entry.snapshot.name, categoryId };
     const updateQuantity = (index: number, value: number) => setLogged(current => ({ ...current, ingredients: current.ingredients.map((ingredient, i) => { if (i !== index)
             return ingredient; const factor = value / ingredient.snapshot.quantity; return { ...ingredient, snapshot: { ...ingredient.snapshot, quantity: value, calories: ingredient.snapshot.calories * factor, protein: ingredient.snapshot.protein * factor, carbohydrates: ingredient.snapshot.carbohydrates * factor, fat: ingredient.snapshot.fat * factor, fibre: ingredient.snapshot.fibre === undefined ? undefined : ingredient.snapshot.fibre * factor } }; }) }));
-    const addFood = (food: Food) => { setLogged(current => ({ ...current, ingredients: [...current.ingredients, { id: id(), enabled: true, snapshot: createSnapshot(food, food.baseQuantity) }] })); setAdding(false); setQuery(""); };
-    const matches = foods.filter(food => food.name.toLowerCase().includes(query.toLowerCase()) && !logged.ingredients.some(ingredient => ingredient.snapshot.foodId === food.id)).slice(0, 8);
+    const addFood = (food: Food) => { setLogged(current => ({ ...current, ingredients: [...current.ingredients, { id: id(), enabled: true, snapshot: createSnapshot(food, food.baseQuantity) }] })); setAdding(false); };
     const preview = recipeSnapshot(recipeInfo, logged);
     const validate = () => { if (!logged.ingredients.length)
         throw new Error("Keep at least one ingredient"); if (logged.ingredients.some(ingredient => !Number.isFinite(ingredient.snapshot.quantity) || ingredient.snapshot.quantity <= 0))
@@ -208,6 +222,7 @@ export function RecipeEntryEditor({ entry, onClose, onSaved, onDelete }: {
     catch (ex) {
         setError(ex instanceof Error ? ex.message : "Could not scale servings");
     } };
+    if(adding)return <><RecipeIngredientPicker categories={categories} excludedIds={logged.ingredients.map(item=>item.snapshot.foodId).filter((value):value is string=>Boolean(value))} onClose={()=>setAdding(false)} onSelected={addFood} onCustom={()=>setCustomFood(true)}/>{customFood&&<InlineFoodDialog categories={categories} onClose={()=>setCustomFood(false)} onCreated={food=>{addFood(food);setCustomFood(false)}}/>}</>;
     return <main className="screen recipe-instance">
       <header className="modal-header"><button className="icon-button close" onClick={onClose} aria-label="Close"><X /></button><h1>Edit Recipe Entry</h1><span className="header-spacer"/></header>
       <section className="recipe-instance-summary"><label className="logged-servings"><span>Servings logged</span><input type="number" min="0.1" step="0.1" inputMode="decimal" value={servings} onChange={e=>setServings(e.target.value)} onBlur={applyServings}/></label><h2>{recipeInfo.name}</h2><strong><EnergyText calories={preview.calories} /></strong><span>P {roundMacro(preview.protein)} · C {roundMacro(preview.carbohydrates)} · F {roundMacro(preview.fat)}</span></section>
@@ -217,7 +232,6 @@ export function RecipeEntryEditor({ entry, onClose, onSaved, onDelete }: {
       {!!logged.instructions?.length&&<section className="logged-instructions"><h3>Preparation</h3><ol>{logged.instructions.map((step,index)=><li key={`${index}-${step}`}>{step}</li>)}</ol></section>}
       <label className="toggle-row recipe-consumed"><span><strong>Consumed</strong><small>Include in consumed totals</small></span><input type="checkbox" checked={consumed} onChange={e=>setConsumed(e.target.checked)}/></label>
       <div className="recipe-instance-actions"><button className="primary" onClick={()=>setSaveOptions(true)}>Save changes</button><button className="danger" onClick={async()=>{await db.entries.delete(entry.id);onDelete(entry);onSaved()}}><Trash2 />Delete entry</button></div>
-      {adding&&<div className="dialog-backdrop"><div className="dialog instance-add-dialog"><h2>Add ingredient this time</h2><p>This changes only this logged meal.</p><label className="dialog-search"><Search /><input type="search" value={query} onChange={e=>setQuery(e.target.value)} autoFocus placeholder="Search saved foods"/></label><div className="instance-food-results">{matches.map(food=><button key={food.id} onClick={()=>addFood(food)}><span><strong>{food.name}</strong><small>{food.baseQuantity} {food.baseUnit} · <EnergyText calories={food.calories} /></small></span><Plus /></button>)}</div><button className="inline-create" onClick={()=>setCustomFood(true)}><Plus />Create new food</button><div><button onClick={()=>setAdding(false)}>Cancel</button></div></div></div>}
       {saveOptions&&<div className="dialog-backdrop"><div className="dialog recipe-save-dialog"><h2>Save recipe changes</h2><p>Choose whether these ingredient changes belong only to this meal or to a reusable recipe.</p><button className="save-choice primary" onClick={()=>void finish("meal")}><strong>This meal only</strong><small>Keep the saved recipe unchanged.</small></button>{saved&&<button className="save-choice" onClick={()=>void finish("update")}><strong>Update “{saved.name}”</strong><small>Enabled ingredients become the new recipe.</small></button>}<label>New recipe name<input value={newRecipeName} onChange={e=>setNewRecipeName(e.target.value)}/></label><button className="save-choice" onClick={()=>void finish("copy")}><strong>Save as new recipe</strong><small>Create an independent reusable recipe.</small></button><div><button onClick={()=>setSaveOptions(false)}>Cancel</button></div></div></div>}
       {customFood&&<InlineFoodDialog categories={categories} onClose={()=>setCustomFood(false)} onCreated={food=>{addFood(food);setCustomFood(false)}}/>}
       {selectedId&&<IngredientEditToolbar index={logged.ingredients.findIndex(item=>item.id===selectedId)} count={logged.ingredients.length} onDone={()=>setSelectedId(undefined)} onMove={moveSelected} onDelete={()=>{setLogged(current=>({...current,ingredients:current.ingredients.filter(item=>item.id!==selectedId)}));setSelectedId(undefined)}}/>}

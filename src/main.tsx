@@ -20,6 +20,7 @@ import "./foodImportActions.css";
 import "./energy.css";
 import "./energyInput.css";
 import "./recipeList.css";
+import "./recipeIngredientPicker.css";
 import "./schedules.css";
 import "./accessibility.css";
 import "./dropbox.css";
