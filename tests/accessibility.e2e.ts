@@ -64,6 +64,35 @@ test("FSANZ search and label imports require review before saving", async ({ pag
   await expectNoSeriousViolations(page);
 });
 
+test("Australian generic search understands common food names and aliases", async ({ page }) => {
+  await page.goto("/#screen=day&date=2026-07-27");
+  await page.getByRole("button", { name: "Food", exact: true }).click();
+  const search = page.getByPlaceholder("Food name, brand or category");
+  await search.fill("naval orange");
+  await expect(page.getByText("Orange, navel, peeled, raw", { exact: true })).toBeVisible();
+  await search.fill("quick oats");
+  await expect(page.getByText("Quick oats", { exact: true })).toBeVisible();
+  await expect(page.getByText("Oats, rolled, uncooked", { exact: true })).toBeVisible();
+});
+
+test("renaming a recipe updates its existing day card", async ({ page }) => {
+  await page.goto("/#screen=day&date=2026-07-27");
+  await page.getByRole("button", { name: "Food", exact: true }).click();
+  await page.getByRole("button", { name: "Recipes", exact: true }).click();
+  await page.getByRole("button", { name: "Log", exact: true }).first().click();
+  await page.getByRole("button", { name: "Log recipe" }).click();
+  await expect(page.getByRole("button", { name: "Edit Beef Rice Bowl" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Food", exact: true }).click();
+  await page.getByRole("button", { name: "Recipes", exact: true }).click();
+  await page.getByRole("button", { name: /Beef Rice Bowl/i }).click();
+  await page.getByLabel("Recipe name").fill("Weeknight Beef Bowl");
+  await page.getByRole("button", { name: "Save recipe" }).click();
+  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("button", { name: "Edit Weeknight Beef Bowl" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit Beef Rice Bowl" })).toHaveCount(0);
+});
+
 test("Australian fast food catalogue finds Chicken Rappa offline and requires review", async ({ page }) => {
   await page.goto("/#screen=day&date=2026-07-27");
   await page.getByRole("button", { name: "Food", exact: true }).click();

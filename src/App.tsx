@@ -135,6 +135,7 @@ import { scheduledTemplateDates } from "./domain/templates";
 import { energyValue } from "./domain/energy";
 import { per100Units, servingUnits, unitForMode } from "./domain/foodUnits";
 import { foodUnitLabel, formatFoodQuantity } from "./domain/foodQuantity";
+import { matchesFoodSearch } from "./domain/foodSearch";
 import { EnergyDisplayProvider, EnergyText, useEnergyDisplay } from "./energyDisplay";
 import { EnergyInput } from "./energyInput";
 import {
@@ -1027,9 +1028,7 @@ function FoodPicker({
         .filter(
           (f) =>
             (!category || f.categoryId === category) &&
-            `${f.name} ${f.brand ?? ""} ${f.notes ?? ""} ${categories.find((c) => c.id === f.categoryId)?.name ?? ""}`
-              .toLowerCase()
-              .includes(query.toLowerCase()),
+            matchesFoodSearch(`${f.name} ${f.brand ?? ""} ${f.notes ?? ""} ${categories.find((c) => c.id === f.categoryId)?.name ?? ""}`,query),
         )
         .sort(
           (a, b) =>
@@ -1212,7 +1211,7 @@ function FoodPicker({
           </div>}
           <div className="picker-meta">
             <span>{visible.length} foods</span>
-            <span>{query.trim().length < 2 ? "Type 2+ letters to search FSANZ" : "Local · FSANZ · A–Z"}</span>
+            <span>{query.trim().length < 2 ? "Search saved + Australian generic foods" : "Saved · FSANZ generic · A–Z"}</span>
           </div>
           <section className="food-list">
             {visible.map((food) => {

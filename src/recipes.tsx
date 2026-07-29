@@ -7,6 +7,7 @@ import { ArrowDown, ArrowUp, Check, Copy, GripVertical, Pencil, Plus, Search, Tr
 import { addRecipeToDay, db, id, saveRecipe, updateLoggedRecipeEntry } from "./data/db";
 import { recipeIngredientsFromLogged, recipeSnapshot, scaleLoggedRecipe } from "./domain/recipes";
 import { createSnapshot, roundMacro } from "./domain/nutrition";
+import { matchesFoodSearch } from "./domain/foodSearch";
 import { EnergyText } from "./energyDisplay";
 import type { DayFoodEntry, Food, FoodCategory, FoodUnit, ISODate, LoggedRecipe, LoggedRecipeIngredient, Recipe, RecipeIngredient } from "./domain/types";
 const RecipeImport=lazy(()=>import("./recipeImport").then(module=>({default:module.RecipeImport})));
@@ -52,13 +53,13 @@ function RecipeIngredientPicker({categories,excludedIds,onClose,onSelected,onCus
   const [category,setCategory]=useState<string>();
   const excluded=new Set(excludedIds);
   const savedIds=new Set(foods.map(food=>food.id));
-  const visible=useMemo(()=>[...foods,...(query.trim().length>=2?catalogFoods.filter(food=>!savedIds.has(food.id)):[])].filter(food=>!excluded.has(food.id)&&(!category||food.categoryId===category)&&`${food.name} ${food.brand??""} ${food.notes??""} ${categories.find(item=>item.id===food.categoryId)?.name??""}`.toLowerCase().includes(query.toLowerCase())).sort((a,b)=>(b.lastLoggedAt??"").localeCompare(a.lastLoggedAt??"")||b.logCount-a.logCount||a.name.localeCompare(b.name)),[foods,catalogFoods,query,category,categories,excludedIds.join("|")]);
+  const visible=useMemo(()=>[...foods,...(query.trim().length>=2?catalogFoods.filter(food=>!savedIds.has(food.id)):[])].filter(food=>!excluded.has(food.id)&&(!category||food.categoryId===category)&&matchesFoodSearch(`${food.name} ${food.brand??""} ${food.notes??""} ${categories.find(item=>item.id===food.categoryId)?.name??""}`,query)).sort((a,b)=>(b.lastLoggedAt??"").localeCompare(a.lastLoggedAt??"")||b.logCount-a.logCount||a.name.localeCompare(b.name)),[foods,catalogFoods,query,category,categories,excludedIds.join("|")]);
   const choose=async(food:Food)=>{if(!savedIds.has(food.id))await db.foods.put(food);onSelected(food)};
   return <main className="screen picker-screen recipe-ingredient-picker">
     <header className="modal-header"><button className="icon-button close" onClick={onClose} aria-label="Close ingredient picker"><X/></button><h1>Choose Ingredient</h1><button className="icon-button add" onClick={onCustom} aria-label="Add custom ingredient food"><Plus/></button></header>
     <label className="search"><Search/><span className="sr-only">Search foods</span><input type="search" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Food name, brand or category"/></label>
     <div className="chips" role="group" aria-label="Filter by category"><button className={!category?"selected":""} onClick={()=>setCategory(undefined)}>All</button>{categories.map(item=><button key={item.id} className={category===item.id?"selected":""} onClick={()=>setCategory(category===item.id?undefined:item.id)}><i style={{background:item.colour}}/>{item.name}</button>)}</div>
-    <div className="picker-meta"><span>{visible.length} foods</span><span>{query.trim().length<2?"Type 2+ letters to search FSANZ":"Local · FSANZ · A–Z"}</span></div>
+    <div className="picker-meta"><span>{visible.length} foods</span><span>{query.trim().length<2?"Search saved + Australian generic foods":"Saved · FSANZ generic · A–Z"}</span></div>
     <section className="food-list">{visible.map(food=>{const cat=categories.find(item=>item.id===food.categoryId);return <div className="food-row recipe-food-choice" key={food.id}><button className="food-select" onClick={()=>void choose(food)}><i style={{background:cat?.colour}}/><span><strong>{food.name}</strong><small>{food.brand?`${food.brand} · `:""}{food.source?.kind==="fsanz"?`FSANZ ${food.source.datasetVersion}`:food.logCount?`${food.logCount} logs`:"Never logged"}</small></span><b>{food.calculationMode==="per100"?`100 ${food.baseUnit}`:food.servingDescription??`1 ${food.baseUnit}`}<small><EnergyText calories={food.calories}/></small></b></button></div>})}{!visible.length&&<p className="no-results">No matching unused foods.</p>}</section>
     <button className="floating-add" onClick={onCustom}><Plus/>Custom food</button>
   </main>;
