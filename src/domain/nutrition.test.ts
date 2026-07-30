@@ -12,5 +12,6 @@ describe("nutrition calculations", () => {
   it("respects an arbitrary weight or volume base quantity",()=>expect(calculateNutrients(food({calculationMode:"per100",baseQuantity:200,baseUnit:"ml",calories:120}),50).calories).toBe(30));
   it("separates planned and consumed totals", () => { const snap=createSnapshot(food(),1); const totals=sumEntries([entry(snap,true),entry(snap,false)]); expect(totals.planned.calories).toBe(400); expect(totals.consumed.calories).toBe(200); expect(totals.planned.protein).toBe(40); expect(totals.consumed.protein).toBe(20); });
   it("keeps historical snapshots stable when a saved food changes", () => { const saved=food(); const historical=createSnapshot(saved,1); saved.calories=999; saved.name="Edited food"; expect(historical.calories).toBe(200); expect(historical.name).toBe("Test food"); });
+  it("preserves unavailable macro metadata in historical snapshots",()=>expect(createSnapshot(food({unavailableNutrients:["protein","carbohydrates","fat"]}),1).unavailableNutrients).toEqual(["protein","carbohydrates","fat"]));
   it("recalculates every nutrient when an entry snapshot quantity changes",()=>{const resized=resizeSnapshot(createSnapshot(food(),1),2.5);expect(resized).toMatchObject({quantity:2.5,calories:500,protein:50,carbohydrates:25,fat:12.5})});
 });

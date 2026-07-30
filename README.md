@@ -79,7 +79,7 @@ The PWA never embeds FatSecret credentials. Follow [worker/README.md](worker/REA
 - Local food search, category filters, usage metadata, custom food creation and saved-food editing
 - Offline FSANZ AUSNUT 2023 catalogue search with 3,741 Australian foods, source/derivation metadata and useful source-derived household measures
 - Optional Open Food Facts branded search and barcode lookup with community-source labelling
-- Restaurant-first Australian fast-food search across 50 major chains through an optional FatSecret-backed Cloudflare Worker, with a source-labelled offline starter catalogue
+- Restaurant-first Australian fast-food flow across 50 major chains, including verified kJ-only entry without fabricated macros, a source-labelled offline starter catalogue, and an optional paid FatSecret-backed Worker
 - Camera barcode capture using native detection or the bundled open-source ZXing fallback, with manual barcode entry as a final fallback
 - Nutrition-label photo intake, on-device text detection where available, iPhone Live Text/manual fallback, and parsed Australian nutrition panels
 - Mandatory review confirmation before barcode, branded, or label-derived nutrition is saved

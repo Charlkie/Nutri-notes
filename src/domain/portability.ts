@@ -44,6 +44,7 @@ const snapshot = z.object({
   unit: z.enum(["g", "ml", "serving", "slice", "item", "scoop"]),
   calculationMode: z.enum(["per100", "perServing"]),
   baseQuantity: z.number().positive(),
+  unavailableNutrients: z.array(z.enum(["protein", "carbohydrates", "fat", "fibre"])).optional(),
   ...nutrients,
 });
 const schedule = z.object({

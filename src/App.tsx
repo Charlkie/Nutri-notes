@@ -830,7 +830,7 @@ function DayScreen({
         </button>
       </div>
       {data.entries.length > 0 && (
-        <NutritionSummary totals={totals} targets={settings.targets} />
+        <NutritionSummary totals={totals} targets={settings.targets} hasIncompleteMacros={data.entries.some(entry=>entry.snapshot.unavailableNutrients?.some(key=>key!=="fibre"))} />
       )}
       {data.entries.length === 0 ? (
         <section className="empty-day">
@@ -1064,9 +1064,9 @@ function SortableFoodCard({
             </b>
           </span>
           <span className="macros">
-            <span>P {roundMacro(entry.snapshot.protein)} g</span>
-            <span>C {roundMacro(entry.snapshot.carbohydrates)} g</span>
-            <span>F {roundMacro(entry.snapshot.fat)} g</span>
+            <span>P {entry.snapshot.unavailableNutrients?.includes("protein")?"—":`${roundMacro(entry.snapshot.protein)} g`}</span>
+            <span>C {entry.snapshot.unavailableNutrients?.includes("carbohydrates")?"—":`${roundMacro(entry.snapshot.carbohydrates)} g`}</span>
+            <span>F {entry.snapshot.unavailableNutrients?.includes("fat")?"—":`${roundMacro(entry.snapshot.fat)} g`}</span>
           </span>
         </span>
       </button>
@@ -1101,9 +1101,11 @@ function SortableFoodCard({
 function NutritionSummary({
   totals,
   targets,
+  hasIncompleteMacros,
 }: {
   totals: ReturnType<typeof sumEntries>;
   targets: AppSettings["targets"];
+  hasIncompleteMacros?: boolean;
 }) {
   const { unit, toggle } = useEnergyDisplay();
   const [flashing, setFlashing] = useState(false);
@@ -1160,6 +1162,7 @@ function NutritionSummary({
           <b>{roundMacro(totals.planned.fat)}g</b>
         </span>
       </div>
+      {hasIncompleteMacros&&<small className="partial-macro-note">Macro totals exclude foods whose source only publishes energy.</small>}
     </section>
   );
 }
@@ -2404,6 +2407,7 @@ function EntryForm({
   };
   const name = food?.name ?? entry?.snapshot.name ?? "Food";
   const unit = food?.baseUnit ?? entry?.snapshot.unit;
+  const unavailableNutrients = food?.unavailableNutrients ?? entry?.snapshot.unavailableNutrients;
   const cat = categories.find(
     (c) => c.id === (food?.categoryId ?? entry?.snapshot.categoryId),
   );
@@ -2488,15 +2492,15 @@ function EntryForm({
             </span>
             <span>
               <small>PROTEIN</small>
-              <b>{roundMacro(preview.protein)} g</b>
+              <b>{unavailableNutrients?.includes("protein")?"—":`${roundMacro(preview.protein)} g`}</b>
             </span>
             <span>
               <small>CARBS</small>
-              <b>{roundMacro(preview.carbohydrates)} g</b>
+              <b>{unavailableNutrients?.includes("carbohydrates")?"—":`${roundMacro(preview.carbohydrates)} g`}</b>
             </span>
             <span>
               <small>FAT</small>
-              <b>{roundMacro(preview.fat)} g</b>
+              <b>{unavailableNutrients?.includes("fat")?"—":`${roundMacro(preview.fat)} g`}</b>
             </span>
           </div>
         )}

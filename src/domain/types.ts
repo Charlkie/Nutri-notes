@@ -10,6 +10,7 @@ export interface Nutrients {
   fat: number;
   fibre?: number;
 }
+export type MacroNutrient = "protein" | "carbohydrates" | "fat" | "fibre";
 export type FoodSourceKind = "custom" | "seed" | "fsanz" | "open-food-facts" | "nutrition-label" | "restaurant";
 export interface FoodSource {
   kind: FoodSourceKind;
@@ -41,6 +42,7 @@ export interface Food extends Nutrients {
   barcode?: string;
   source?: FoodSource;
   measures?: FoodMeasure[];
+  unavailableNutrients?: MacroNutrient[];
   logCount: number;
   lastLoggedAt?: string;
   createdAt: string;
@@ -58,6 +60,7 @@ export interface FoodSnapshot extends Nutrients {
   unit: FoodUnit;
   calculationMode: CalculationMode;
   baseQuantity: number;
+  unavailableNutrients?: MacroNutrient[];
 }
 export interface RecipeIngredient {
   id: ID;

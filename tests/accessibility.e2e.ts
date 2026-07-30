@@ -254,6 +254,28 @@ test("Australian fast food catalogue finds Chicken Rappa offline and requires re
   await expectNoSeriousViolations(page);
 });
 
+test("official menu energy can be saved without inventing unpublished macros",async({page})=>{
+  await page.goto("/#screen=day&date=2026-07-27");
+  await page.getByRole("button",{name:"Food",exact:true}).click();
+  await page.getByRole("button",{name:/Import label/i}).click();
+  await page.getByRole("button",{name:/Australian fast food/i}).click();
+  await page.getByRole("button",{name:/McDonald's.*Add from official menu kJ/i}).click();
+  await page.getByRole("button",{name:"Add from official menu kJ"}).click();
+  await page.getByLabel("Food name").fill("Official energy test burger");
+  await page.getByRole("button",{name:/Energy unit kcal/}).click();
+  await page.getByRole("spinbutton",{name:"Energy in kilojoules"}).fill("2500");
+  await expect(page.getByLabel("Protein (g)")).toHaveValue("");
+  await expect(page.getByLabel("Protein (g)")).toHaveAttribute("placeholder","Not published");
+  await page.getByRole("checkbox",{name:/I checked these values/i}).check();
+  await page.getByRole("button",{name:"Save verified food"}).click();
+  await expect(page.locator(".preview")).toContainText("PROTEIN—");
+  await page.getByRole("button",{name:"Add food"}).click();
+  const card=page.getByRole("button",{name:"Edit Official energy test burger"});
+  await expect(card).toContainText("P —");
+  await expect(card).toContainText("C —");
+  await expect(card).toContainText("F —");
+});
+
 test("energy unit toggle updates and persists", async ({ page }) => {
   const yesterday = await page.evaluate(() => {
     const date = new Date();

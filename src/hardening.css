@@ -394,3 +394,10 @@
   overflow-y: auto;
   overscroll-behavior-y: contain;
 }
+
+.partial-macro-note {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 9px;
+  text-align: center;
+}

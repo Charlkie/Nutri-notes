@@ -49,7 +49,8 @@ export const restaurantFoods: RestaurantFood[] = [
   nandos("Supremo Chicken Wrap",332,648,41.9,52.5,28.9),
 ];
 
-export const restaurantNames=[...new Set(restaurantFoods.map(food=>food.restaurant))].sort((a,b)=>a.localeCompare(b));
+export const majorAustralianRestaurantNames=["McDonald's","KFC","Hungry Jack's","Subway","Domino's","Pizza Hut","Red Rooster","Oporto","Nando's","Guzman y Gomez","Grill'd","Zambrero","Mad Mex","Taco Bell","Carl's Jr.","Starbucks","Gloria Jean's","The Coffee Club","Boost Juice","Donut King","Krispy Kreme","Bakers Delight","Muffin Break","Sushi Hub","Roll'd","Schnitz","Betty's Burgers","Burger Urge","Lord of the Fries","Soul Origin","SumoSalad","Fishbowl","El Jannah","Ribs & Burgers","Crust Pizza","Pizza Capers","Gelatissimo","San Churro","Max Brenner","Chatime","Gong Cha","Sharetea","Oliver's Real Food","Jamaica Blue","Hudsons Coffee","Zarraffa's Coffee","Pie Face","Chicken Treat","Rashays","The Cheesecake Shop"];
+export const restaurantNames=[...new Set([...majorAustralianRestaurantNames,...restaurantFoods.map(food=>food.restaurant)])];
 
 export function searchRestaurantFoods(query: string, restaurant = "all"): RestaurantFood[] {
   const needle = query.trim().toLocaleLowerCase();

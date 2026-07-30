@@ -20,7 +20,7 @@ export function calculateNutrients(food: Food, quantity: number): Nutrients {
 }
 
 export function createSnapshot(food: Food, quantity: number): FoodSnapshot {
-  return { foodId: food.id, name: food.name, brand: food.brand, categoryId: food.categoryId, quantity, unit: food.baseUnit, calculationMode: food.calculationMode, baseQuantity: food.baseQuantity, ...calculateNutrients(food, quantity) };
+  return { foodId: food.id, name: food.name, brand: food.brand, categoryId: food.categoryId, quantity, unit: food.baseUnit, calculationMode: food.calculationMode, baseQuantity: food.baseQuantity, unavailableNutrients: food.unavailableNutrients ? [...food.unavailableNutrients] : undefined, ...calculateNutrients(food, quantity) };
 }
 
 export function resizeSnapshot(snapshot:FoodSnapshot,quantity:number):FoodSnapshot {
