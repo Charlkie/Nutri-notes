@@ -1,9 +1,12 @@
 import type { FoodDraft } from "./foodImport";
+import { dominosMenu, dominosMenuSourceUrl } from "./dominosMenu.generated";
 import { gygMenu } from "./gygMenu.generated";
 import { hungryJacksMenu } from "./hungryJacksMenu.generated";
 import { kfcMenu } from "./kfcMenu.generated";
 import { mcdonaldsMenu } from "./mcdonaldsMenu.generated";
+import { nandosMenu } from "./nandosMenu.generated";
 import { oportoMenu, oportoMenuSource } from "./oportoMenu.generated";
+import { pizzaHutMenu, pizzaHutMenuSource } from "./pizzaHutMenu.generated";
 import { redRoosterMenu, redRoosterMenuSource } from "./redRoosterMenu.generated";
 import { subwayMenu } from "./subwayMenu.generated";
 
@@ -11,9 +14,6 @@ export interface RestaurantFood extends FoodDraft {
   restaurant: string;
   servingGrams?: number;
 }
-
-const nandosSource={kind:"restaurant" as const,provider:"Nando's Australia nutritional information",datasetVersion:"Checked July 2026",importedAt:"2026-07-30T00:00:00.000Z",sourceUrl:"https://www.nandos.com.au/menu-item"};
-const nandos=(name:string,grams:number,calories:number,protein:number,carbohydrates:number,fat:number):RestaurantFood=>({restaurant:"Nando's",name,brand:"Nando's",categoryId:"other",calculationMode:"perServing",baseQuantity:1,baseUnit:"serving",servingDescription:`1 serve (${grams} g)`,servingGrams:grams,calories,protein,carbohydrates,fat,notes:"Bundled from Nando's Australia published nutrition information. Menu recipes and portions can change; verify against the current restaurant listing.",source:nandosSource});
 
 const mcdonaldsDessertsSource = {
   kind: "restaurant" as const,
@@ -88,6 +88,80 @@ const kfcFoods: RestaurantFood[] = kfcMenu.map(([name, kilojoules]) => ({
     datasetVersion: "Official online menu captured 30 July 2026; page nutrition notice dated September 2023",
     importedAt: "2026-07-30T00:00:00.000Z",
     sourceUrl: kfcSourceUrl,
+  },
+}));
+
+const dominosFoods: RestaurantFood[] = dominosMenu.map(([name, category, variant, servingGrams, servingsPerItem, kilojoules, calories, protein, carbohydrates, fat]) => ({
+  restaurant: "Domino's",
+  name,
+  brand: "Domino's",
+  categoryId: "other",
+  calculationMode: "perServing",
+  baseQuantity: 1,
+  baseUnit: "serving",
+  servingDescription: servingsPerItem > 1
+    ? `1 ${variant} slice (${servingGrams} g; ${servingsPerItem} slices per pizza)`
+    : `1 ${variant} serving (${servingGrams} g)`,
+  servingGrams,
+  calories,
+  protein,
+  carbohydrates,
+  fat,
+  notes: `Domino's Australia publishes ${kilojoules} kJ per serving for this ${category} configuration. Pizza values are per slice, not per whole pizza. Standard formulations, portions and availability can change.`,
+  source: {
+    kind: "restaurant",
+    provider: "Domino's Australia nutritional information",
+    datasetVersion: "Official online nutrition catalogue captured 31 July 2026",
+    importedAt: "2026-07-31T00:00:00.000Z",
+    sourceUrl: dominosMenuSourceUrl,
+  },
+}));
+
+const nandosFoods: RestaurantFood[] = nandosMenu.map(([name, category, servingGrams, kilojoules, calories, protein, carbohydrates, fat, sourcePath]) => ({
+  restaurant: "Nando's",
+  name,
+  brand: "Nando's",
+  categoryId: "other",
+  calculationMode: "perServing",
+  baseQuantity: 1,
+  baseUnit: "serving",
+  servingDescription: `1 serve (${servingGrams} g)`,
+  servingGrams,
+  calories,
+  protein,
+  carbohydrates,
+  fat,
+  notes: `Nando's Australia publishes ${kilojoules} kJ per serving for this ${category} item. Hand-portioned serves, recipes and availability can change.`,
+  source: {
+    kind: "restaurant",
+    provider: "Nando's Australia nutritional information",
+    datasetVersion: "Official item nutrition pages captured 31 July 2026",
+    importedAt: "2026-07-31T00:00:00.000Z",
+    sourceUrl: `https://www.nandos.com.au/${sourcePath}`,
+  },
+}));
+
+const pizzaHutFoods: RestaurantFood[] = pizzaHutMenu.map(([name, category, sizeName, productType, kilojoules]) => ({
+  restaurant: "Pizza Hut",
+  name,
+  brand: "Pizza Hut",
+  categoryId: "other",
+  calculationMode: "perServing",
+  baseQuantity: 1,
+  baseUnit: "serving",
+  servingDescription: productType === "Pizzas" ? `1 ${sizeName} Original Pan pizza` : `1 ${sizeName.toLocaleLowerCase()} menu item`,
+  calories: kilojoules / 4.184,
+  protein: 0,
+  carbohydrates: 0,
+  fat: 0,
+  unavailableNutrients: ["protein", "carbohydrates", "fat", "fibre"],
+  notes: `Pizza Hut Australia's official ${pizzaHutMenuSource.storeName} ordering feed publishes ${kilojoules} kJ for this ${category} item. Pizza energy is based on the Original Pan base. Catalogue-level macros were not published and are intentionally unavailable.`,
+  source: {
+    kind: "restaurant",
+    provider: "Pizza Hut Australia official ordering menu",
+    datasetVersion: `Store ${pizzaHutMenuSource.storeCode} catalogue captured 31 July 2026`,
+    importedAt: "2026-07-31T00:00:00.000Z",
+    sourceUrl: pizzaHutMenuSource.configurationUrl,
   },
 }));
 
@@ -220,13 +294,14 @@ export const restaurantFoods: RestaurantFood[] = [
   mcdonaldsDessert("Birthday Cake – Ice Cream Cake", "1 slice (44 g)", 44, 81, 0.8, 12.5, 2.9),
   mcdonaldsDessert("Honey", "1 packet (13 g)", 13, 44, 0, 10.8, 0),
   ...kfcFoods,
+  ...dominosFoods,
+  ...pizzaHutFoods,
   ...redRoosterFoods,
   ...oportoFoods,
+  ...nandosFoods,
   ...hungryJacksFoods,
   ...subwayFoods,
   ...gygFoods,
-  nandos("Half PERi-PERi Chicken",460,715,108,1.1,30.8),
-  nandos("Supremo Chicken Wrap",332,648,41.9,52.5,28.9),
 ];
 
 export const majorAustralianRestaurantNames=["McDonald's","KFC","Hungry Jack's","Subway","Domino's","Pizza Hut","Red Rooster","Oporto","Nando's","Guzman y Gomez","Grill'd","Zambrero","Mad Mex","Taco Bell","Carl's Jr.","Starbucks","Gloria Jean's","The Coffee Club","Boost Juice","Donut King","Krispy Kreme","Bakers Delight","Muffin Break","Sushi Hub","Roll'd","Schnitz","Betty's Burgers","Burger Urge","Lord of the Fries","Soul Origin","SumoSalad","Fishbowl","El Jannah","Ribs & Burgers","Crust Pizza","Pizza Capers","Gelatissimo","San Churro","Max Brenner","Chatime","Gong Cha","Sharetea","Oliver's Real Food","Jamaica Blue","Hudsons Coffee","Zarraffa's Coffee","Pie Face","Chicken Treat","Rashays","The Cheesecake Shop"];

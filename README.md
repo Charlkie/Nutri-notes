@@ -77,6 +77,9 @@ The restaurant importers require `curl`; PDF-backed catalogues also require Popp
 
 ```bash
 diff -u src/domain/mcdonaldsMenu.generated.ts <(node scripts/import-mcdonalds.mjs)
+diff -u src/domain/dominosMenu.generated.ts <(node scripts/import-dominos.mjs)
+diff -u src/domain/nandosMenu.generated.ts <(node scripts/import-nandos.mjs)
+diff -u src/domain/pizzaHutMenu.generated.ts <(node scripts/import-pizza-hut.mjs)
 diff -u src/domain/oportoMenu.generated.ts <(node scripts/import-craveable-menu.mjs oporto)
 diff -u src/domain/redRoosterMenu.generated.ts <(node scripts/import-craveable-menu.mjs red-rooster)
 diff -u src/domain/hungryJacksMenu.generated.ts <(node scripts/import-hungry-jacks.mjs)
@@ -93,8 +96,8 @@ diff -u src/domain/gygMenu.generated.ts <(node scripts/import-gyg.mjs)
 - Local food search, category filters, usage metadata, custom food creation and saved-food editing
 - Offline FSANZ AUSNUT 2023 catalogue search with 3,741 Australian foods, source/derivation metadata and useful source-derived household measures
 - Optional Open Food Facts branded search and barcode lookup with community-source labelling
-- Restaurant-first Australian fast-food flow across 50 major chains, including verified kJ-only entry without fabricated macros and source-labelled offline catalogues: 60 McDonald's core items, 118 KFC items, 188 Red Rooster items, 152 Oporto items, 179 Hungry Jack's items, 179 Subway items and 287 Guzman y Gomez items
-- Reproducible official-document and official ordering-feed importers for McDonald's Australia, Red Rooster, Oporto, Hungry Jack's, Subway Australia and Guzman y Gomez; generated menu data keeps its source and revision timestamp attached to saved foods
+- Restaurant-first Australian fast-food flow across 50 major chains, including verified kJ-only entry without fabricated macros and source-labelled offline catalogues: 60 McDonald's core items, 259 Domino's crust/size variants, 121 Pizza Hut items, 118 KFC items, 188 Red Rooster items, 152 Oporto items, 21 Nando's servings, 179 Hungry Jack's items, 179 Subway items and 287 Guzman y Gomez items
+- Reproducible official-document, nutrition-page and ordering-feed importers for McDonald's Australia, Domino's Australia, Pizza Hut Australia, Red Rooster, Oporto, Nando's Australia, Hungry Jack's, Subway Australia and Guzman y Gomez; generated menu data keeps its source and revision timestamp attached to saved foods
 - Camera barcode capture using native detection or the bundled open-source ZXing fallback, with manual barcode entry as a final fallback
 - Nutrition-label photo intake, on-device text detection where available, iPhone Live Text/manual fallback, and parsed Australian nutrition panels
 - Mandatory review confirmation before barcode, branded, or label-derived nutrition is saved
