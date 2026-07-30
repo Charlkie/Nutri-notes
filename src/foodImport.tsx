@@ -6,6 +6,7 @@ import { db } from "./data/db";
 import { EnergyText } from "./energyDisplay";
 import { EnergyInput } from "./energyInput";
 import { restaurantFoods,restaurantNames,searchRestaurantFoods } from "./domain/restaurantFoods";
+import { fetchRestaurantFood, fetchRestaurantMenu, fetchRestaurantNames, restaurantApiConfigured, type RestaurantProviderItem } from "./domain/restaurantApi";
 
 type Mode = "home" | "barcode" | "branded" | "restaurant" | "label" | "review";
 const blank = (): FoodDraft => ({ name: "", categoryId: "other", calculationMode: "per100", baseQuantity: 100, baseUnit: "g", calories: 0, protein: 0, carbohydrates: 0, fat: 0 });
@@ -33,7 +34,7 @@ export function FoodImportTools({ categories, onClose, onSaved }: { categories: 
       <p>Choose a source. Imported nutrition is never saved until you review it.</p>
       <button onClick={() => setMode("barcode")}><ScanBarcode/><span><strong>Scan a barcode</strong><small>Use the camera or enter the number</small></span></button>
       <button onClick={() => setMode("branded")}><Wifi/><span><strong>Search branded foods</strong><small>Optional Open Food Facts lookup</small></span></button>
-      <button onClick={() => setMode("restaurant")}><Store/><span><strong>Australian fast food</strong><small>Offline restaurant menu catalogue</small></span></button>
+      <button onClick={() => setMode("restaurant")}><Store/><span><strong>Australian fast food</strong><small>Australian restaurant menus · offline fallback</small></span></button>
       <button onClick={() => setMode("label")}><ImagePlus/><span><strong>Import a nutrition label</strong><small>Photo and on-device text recognition</small></span></button>
     </section>}
     {mode === "barcode" && <BarcodeImport onReview={review} />}
@@ -78,10 +79,39 @@ function BrandedSearch({ onReview }: { onReview: (draft: FoodDraft) => void }) {
 function RestaurantSearch({ onReview }: { onReview: (draft: FoodDraft) => void }) {
   const [query, setQuery] = useState("");
   const [restaurant,setRestaurant]=useState<string>();
-  const results = useMemo(() => restaurant?searchRestaurantFoods(query,restaurant):[], [query,restaurant]);
+  const [restaurants,setRestaurants]=useState(restaurantNames);
+  const [providerAvailable,setProviderAvailable]=useState(false);
+  const [providerResults,setProviderResults]=useState<RestaurantProviderItem[]>([]);
+  const [page,setPage]=useState(0);
+  const [hasMore,setHasMore]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const [openingId,setOpeningId]=useState<string>();
+  const [error,setError]=useState("");
+  const localResults = useMemo(() => restaurant?searchRestaurantFoods(query,restaurant):[], [query,restaurant]);
+  useEffect(()=>{
+    if(!restaurantApiConfigured())return;
+    const controller=new AbortController();
+    void fetchRestaurantNames(controller.signal).then(names=>{
+      setRestaurants([...new Set([...names,...restaurantNames])]);
+      setProviderAvailable(true);
+    }).catch(ex=>setError(ex instanceof Error?ex.message:"Restaurant service unavailable"));
+    return()=>controller.abort();
+  },[]);
+  useEffect(()=>{
+    if(!restaurant||!providerAvailable){setProviderResults([]);setHasMore(false);return;}
+    const controller=new AbortController();
+    const timer=window.setTimeout(()=>{
+      setBusy(true);setError("");setPage(0);
+      void fetchRestaurantMenu(restaurant,query,0,controller.signal).then(result=>{setProviderResults(result.items);setHasMore(result.hasMore)}).catch(ex=>{if(!controller.signal.aborted)setError(ex instanceof Error?ex.message:"Restaurant search failed")}).finally(()=>{if(!controller.signal.aborted)setBusy(false)});
+    },query?300:0);
+    return()=>{clearTimeout(timer);controller.abort()};
+  },[restaurant,query,providerAvailable]);
+  const loadMore=async()=>{if(!restaurant||busy)return;try{setBusy(true);setError("");const next=page+1;const result=await fetchRestaurantMenu(restaurant,query,next);setProviderResults(current=>[...current,...result.items.filter(item=>!current.some(existing=>existing.id===item.id))]);setPage(next);setHasMore(result.hasMore)}catch(ex){setError(ex instanceof Error?ex.message:"Restaurant search failed")}finally{setBusy(false)}};
+  const openProviderFood=async(item:RestaurantProviderItem)=>{try{setOpeningId(item.id);setError("");onReview(await fetchRestaurantFood(item.id))}catch(ex){setError(ex instanceof Error?ex.message:"Could not load menu item")}finally{setOpeningId(undefined)}};
   return <section className="restaurant-import">
-    <p className="restaurant-note"><Store/><span><strong>Local Australian catalogue</strong><small>Works offline. Menu recipes and portions can change, so review before saving.</small></span></p>
-    {!restaurant?<><h2 className="restaurant-prompt">Choose a restaurant</h2><div className="restaurant-picker">{restaurantNames.map(name=><button key={name} onClick={()=>{setRestaurant(name);setQuery("")}}><Store/><span><strong>{name}</strong><small>{restaurantFoods.filter(food=>food.restaurant===name).length} menu items</small></span></button>)}</div></>:<><button className="restaurant-change" onClick={()=>{setRestaurant(undefined);setQuery("")}}><ChevronLeft/>All restaurants <b>{restaurant}</b></button><label className="restaurant-search"><Search/><span className="sr-only">Search {restaurant} menu</span><input type="search" value={query} onChange={event=>setQuery(event.target.value)} placeholder={`Search ${restaurant} menu`}/></label><div className="restaurant-results">{results.map(item=><button key={`${item.restaurant}-${item.name}`} onClick={()=>{const {restaurant:_,servingGrams:__,...draft}=item;onReview(draft)}}><span><strong>{item.name}</strong><small>{item.restaurant}{item.servingGrams?` · ${item.servingGrams} g serve`:" · per serve"}</small></span><b><EnergyText calories={item.calories}/><small>P {item.protein} · C {item.carbohydrates} · F {item.fat}</small></b></button>)}</div>{!results.length&&<p className="restaurant-empty">No matching menu item in the offline catalogue. Import its label or create it manually.</p>}</>}
+    <p className="restaurant-note"><Store/><span><strong>{providerAvailable?"Australian restaurant database":"Offline starter catalogue"}</strong><small>{providerAvailable?"Live Australian results. Review every item before saving.":"The live provider is unavailable; saved and bundled foods still work."}</small></span></p>
+    {error&&<p className="form-error" role="alert">{error}</p>}
+    {!restaurant?<><h2 className="restaurant-prompt">Choose a restaurant</h2><div className="restaurant-picker">{restaurants.map(name=><button key={name} onClick={()=>{setRestaurant(name);setQuery("");setError("")}}><Store/><span><strong>{name}</strong><small>{providerAvailable?"Search Australian menu":`${restaurantFoods.filter(food=>food.restaurant===name).length} menu items · offline`}</small></span></button>)}</div></>:<><button className="restaurant-change" onClick={()=>{setRestaurant(undefined);setQuery("");setError("")}}><ChevronLeft/>All restaurants <b>{restaurant}</b></button><label className="restaurant-search"><Search/><span className="sr-only">Search {restaurant} menu</span><input type="search" value={query} onChange={event=>setQuery(event.target.value)} placeholder={`Search ${restaurant} menu`}/></label>{busy&&!providerResults.length&&<div className="loading"><LoaderCircle className="spin"/>Searching {restaurant}…</div>}<div className="restaurant-results">{providerAvailable?providerResults.map(item=><button key={item.id} disabled={openingId===item.id} onClick={()=>void openProviderFood(item)}><span><strong>{item.name}</strong><small>{item.restaurant}{item.description?` · ${item.description}`:""}</small></span>{openingId===item.id?<LoaderCircle className="spin"/>:<ChevronLeft className="result-chevron"/>}</button>):localResults.map(item=><button key={`${item.restaurant}-${item.name}`} onClick={()=>{const {restaurant:_,servingGrams:__,...draft}=item;onReview(draft)}}><span><strong>{item.name}</strong><small>{item.restaurant}{item.servingGrams?` · ${item.servingGrams} g serve`:" · per serve"}</small></span><b><EnergyText calories={item.calories}/><small>P {item.protein} · C {item.carbohydrates} · F {item.fat}</small></b></button>)}</div>{providerAvailable&&hasMore&&<button className="restaurant-load-more" disabled={busy} onClick={()=>void loadMore()}>{busy?<LoaderCircle className="spin"/>:null}Load more menu items</button>}{!(providerAvailable?providerResults:localResults).length&&!busy&&<p className="restaurant-empty">No matching menu item. Try a shorter search, import its label, or create it manually.</p>}</>}
   </section>;
 }
 

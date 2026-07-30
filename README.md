@@ -1,6 +1,6 @@
 # Nutri Notes
 
-A local-first, dark-mode nutrition tracking PWA designed for fast daily logging on iPhone. Data stays in IndexedDB on the device; there is no backend, account, analytics, or ordinary-use network dependency.
+A local-first, dark-mode nutrition tracking PWA designed for fast daily logging on iPhone. Logs stay in IndexedDB on the device; there is no account or analytics. Ordinary logging works offline. An optional stateless restaurant-search worker can retrieve Australian FatSecret menu data without receiving or storing anyone's nutrition log.
 
 > The included starter nutrition values are editable placeholders for development and convenience, not authoritative nutritional advice. Check product labels and trusted sources.
 
@@ -45,7 +45,7 @@ For the first deployment:
 The deployed URL appears in the workflow summary and in **Settings → Pages**.
 On iPhone, open that HTTPS URL in Safari and use **Share → Add to Home Screen**.
 
-This beta has no server or account system. Each browser/device owns a separate
+This beta has no account system. Each browser/device owns a separate
 IndexedDB database, so testers should periodically download a JSON backup from
 Settings. Clearing site data or deleting the installed PWA can remove its local
 records. The Pages URL is not access-controlled; use a public repository for the
@@ -58,12 +58,17 @@ plan in use.
 - `src/data/` contains the versioned Dexie schema, transactions, persistence services, categories, and editable seed foods.
 - `src/App.tsx` contains the current mobile screen flows and accessible interaction controls.
 - `src/styles.css` defines the safe-area-aware, token-driven, iPhone-first visual system.
+- `worker/` contains the optional stateless FatSecret proxy used only for live Australian restaurant searches; credentials remain in Cloudflare Worker secrets.
 - `vite-plugin-pwa` generates the manifest and Workbox service worker at build time.
 - Vite emits stable framework, storage, date, interaction, icon, validation, recipe, and import chunks; Workbox precaches all of them for offline navigation.
 
 Food entries store calculated nutrition snapshots rather than reading live values from the saved food database. Historical logs therefore remain stable after a food is edited. Days and templates each own ordered snapshot collections, so applying, editing, or reordering one cannot mutate its source.
 
 Recipes use the same boundary. Saved recipes reference current foods and define a normal yield; logging freezes scaled ingredient snapshots inside the day entry. Toggling or resizing an ingredient changes only that logged meal.
+
+### Live Australian restaurant search
+
+The PWA never embeds FatSecret credentials. Follow [worker/README.md](worker/README.md) to deploy the Worker, then create the GitHub Actions repository variable `VITE_RESTAURANT_API_URL` containing its HTTPS URL. The Pages workflow injects only that public Worker URL into the production bundle. Search responses are not cached; a reviewed selection becomes an ordinary independent local food snapshot.
 
 ## Implemented
 
@@ -74,7 +79,7 @@ Recipes use the same boundary. Saved recipes reference current foods and define 
 - Local food search, category filters, usage metadata, custom food creation and saved-food editing
 - Offline FSANZ AUSNUT 2023 catalogue search with 3,741 Australian foods, source/derivation metadata and useful source-derived household measures
 - Optional Open Food Facts branded search and barcode lookup with community-source labelling
-- Offline Australian fast-food search with a source-labelled, manually reviewed starter Oporto catalogue
+- Restaurant-first Australian fast-food search across 50 major chains through an optional FatSecret-backed Cloudflare Worker, with a source-labelled offline starter catalogue
 - Camera barcode capture using native detection or the bundled open-source ZXing fallback, with manual barcode entry as a final fallback
 - Nutrition-label photo intake, on-device text detection where available, iPhone Live Text/manual fallback, and parsed Australian nutrition panels
 - Mandatory review confirmation before barcode, branded, or label-derived nutrition is saved
