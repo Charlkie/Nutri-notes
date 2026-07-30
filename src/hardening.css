@@ -361,3 +361,36 @@
     padding-right: 4px;
   }
 }
+
+.basis-presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin: -4px 0 14px;
+}
+
+.basis-presets button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.basis-presets button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: #202a1d;
+  color: var(--accent);
+  font-weight: 750;
+}
+
+.picker-screen {
+  height: 100dvh;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}

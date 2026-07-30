@@ -326,3 +326,24 @@ test("editing a saved food refreshes matching entries on the selected day",async
   await page.getByRole("button",{name:"Close"}).click();
   await expect(page.getByRole("button",{name:"Edit Refresh Test Food"})).toContainText("250 kcal");
 });
+
+test("custom liquids support a per-mL nutrition basis",async({page})=>{
+  await page.goto("/#screen=day&date=2026-07-27");
+  await page.getByRole("button",{name:"Food",exact:true}).click();
+  await page.getByRole("button",{name:"Add custom food"}).click();
+  await page.getByLabel("Food name").fill("Per mL Test Drink");
+  await page.getByRole("button",{name:"Per 1 mL"}).click();
+  await expect(page.getByLabel("Base quantity")).toHaveValue("1");
+  const basisFields = page.locator(".form-grid").filter({ hasText: "Base quantity" }).first();
+  await expect(basisFields.getByRole("combobox")).toHaveValue("ml");
+  await page.getByRole("spinbutton",{name:"Energy in kilocalories"}).fill("0.6");
+  await page.getByRole("button",{name:"Save food"}).click();
+  await page.getByPlaceholder("Food name, brand or category").fill("Per mL Test Drink");
+  await page.locator(".food-select").filter({hasText:"Per mL Test Drink"}).click();
+  await page.getByRole("spinbutton",{name:"Quantity (ml)"}).fill("250");
+  await expect(page.locator(".preview")).toContainText("150 kcal");
+  await page.getByRole("button",{name:"Add food"}).click();
+  const card=page.getByRole("button",{name:"Edit Per mL Test Drink"});
+  await expect(card).toContainText("250 mL");
+  await expect(card).toContainText("150 kcal");
+});

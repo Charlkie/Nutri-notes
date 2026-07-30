@@ -9,7 +9,7 @@ export function assertNonNegative(value: number, label: string): void {
 
 export function calculateNutrients(food: Food, quantity: number): Nutrients {
   assertNonNegative(quantity, "Quantity");
-  const factor = food.calculationMode === "per100" ? quantity / 100 : quantity / food.baseQuantity;
+  const factor = quantity / food.baseQuantity;
   return {
     calories: food.calories * factor,
     protein: food.protein * factor,

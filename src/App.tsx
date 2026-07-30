@@ -1425,7 +1425,7 @@ function FoodPicker({
                     </span>
                     <b>
                       {food.calculationMode === "per100"
-                        ? "100 " + food.baseUnit
+                        ? `${food.baseQuantity} ${food.baseUnit}`
                         : (food.servingDescription ?? `1 ${food.baseUnit}`)}
                       <small><EnergyText calories={food.calories} /></small>
                     </b>
@@ -2240,7 +2240,7 @@ function FoodForm({
                   }))
                 }
               />{" "}
-              Per 100 g / mL
+              By weight / volume
             </label>
             <label>
               <input
@@ -2259,6 +2259,9 @@ function FoodForm({
             </label>
           </div>
         </fieldset>
+        {values.calculationMode === "per100" && <div className="basis-presets" role="group" aria-label="Nutrition basis presets">
+          {([{label:"Per 100 g",quantity:"100",unit:"g"},{label:"Per 100 mL",quantity:"100",unit:"ml"},{label:"Per 1 mL",quantity:"1",unit:"ml"}] as const).map(preset=><button key={preset.label} type="button" aria-pressed={values.baseQuantity===preset.quantity&&values.baseUnit===preset.unit} onClick={()=>setValues(current=>({...current,baseQuantity:preset.quantity,baseUnit:preset.unit}))}>{preset.label}</button>)}
+        </div>}
         <div className="form-grid">
           <Field label="Base quantity">
             <NumberInput
