@@ -158,8 +158,11 @@ export interface TemplateSchedule {
 export interface WeightEntry {
   id: ID;
   date: ISODate;
+  /** Local ISO date-time when the measurement was taken. Legacy entries may only have `date`. */
+  recordedAt?: string;
   weightKg: number;
   note?: string;
+  source?: "manual" | "csv";
 }
 export interface DayTotals {
   planned: Nutrients;

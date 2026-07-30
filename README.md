@@ -54,7 +54,7 @@ plan in use.
 
 ## Architecture
 
-- `src/domain/` contains framework-independent types, nutrition calculations, immutable snapshot creation, totals, and day-copy logic.
+- `src/domain/` contains framework-independent types, nutrition calculations, immutable snapshot creation, totals, day-copy logic, weight aggregation, and generic CSV parsing.
 - `scripts/import-*.mjs` regenerate bundled Australian restaurant catalogues from the chains' official published nutrition PDFs; generated files retain source/version metadata.
 - `src/data/` contains the versioned Dexie schema, transactions, persistence services, categories, and editable seed foods.
 - `src/App.tsx` contains the current mobile screen flows and accessible interaction controls.
@@ -108,8 +108,8 @@ diff -u src/domain/gygMenu.generated.ts <(node scripts/import-gyg.mjs)
 - Full-day template conversion, duplicate-name handling, application, editing and deletion
 - Touch-safe long-press entry selection and persistent drag reordering for days and templates
 - Monday-first nutrition-history calendar with category dots, month navigation and read-only day previews
-- Local body-weight logging with notes, editing, undoable deletion, trends and seven-day averages
-- Local analytics with category/macro breakdowns, nutrition and weight trends, date filters and food rankings
+- Local body-weight logging with notes, editing, undoable deletion, mapped CSV import, same-day timestamp preservation, trends and seven-day averages
+- Local analytics with category/macro breakdowns, selectable planned/consumed nutrition trends, daily average or min–max weight aggregation, dual-axis nutrition/weight overlays, date filters and food rankings
 - Validated versioned JSON backup/restore and spreadsheet-compatible CSV exports
 - Native share-sheet backups for saving JSON to Files, iCloud Drive, Google Drive, Dropbox, AirDrop, or another compatible app, with a direct-download fallback
 - Optional per-user Dropbox App Folder connection with PKCE, debounced automatic backups, offline retry, dated versions, manual backup, reviewed restore, status reporting, and token revocation on disconnect
@@ -178,15 +178,15 @@ The Calendar reads directly from day logs and entry snapshots. It provides Monda
 
 ## Body-weight milestone
 
-The Body tab stores dated kilogram measurements and optional notes locally. It supports same-day updates, editing, undoable deletion, a compact recent trend, overall change, and a trailing seven-calendar-day average calculated from raw entries.
+The Body tab stores timestamped kilogram measurements and optional notes locally. It supports editing, undoable deletion, a compact recent trend, overall change, and a trailing seven-calendar-day average calculated from daily averages. A generic CSV importer detects likely date/time and weight columns, lets the user correct the mapping, handles kg or lb and day-first or month-first dates, previews the import, preserves multiple readings per day, and skips duplicate re-imports.
 
 ## Charts milestone
 
-The Charts tab calculates analytics on demand from immutable day snapshots and weight entries. It includes category and macro calorie breakdowns, daily calorie/macro trends, body-weight trends, food frequency/contribution statistics, and All/Year/Month/Week/Day/custom date ranges.
+The Charts tab calculates analytics on demand from immutable day snapshots and weight entries. It includes category and macro calorie breakdowns, planned or consumed daily calorie/macro trends, body-weight trends, and a dual-axis overlay that can show weight beside any selected nutrition metric. When a day has multiple measurements, weight can be plotted as its average or as min–max whiskers around the daily average. Food frequency/contribution statistics and All/Year/Month/Week/Day/custom date ranges remain available.
 
 ## Data-portability milestone
 
-Settings provides a versioned, validated full JSON backup containing foods, recipes, categories, templates, day logs, ordered snapshots and body weight. Imports support merge or replace; replace first downloads the current database. Separate UTF-8 CSV exports cover day totals, food entries and weight history, with CRLF rows, spreadsheet-safe text and numeric values left numeric.
+Settings provides a versioned, validated full JSON backup containing foods, recipes, categories, templates, day logs, ordered snapshots and timestamped body weight. Imports support merge or replace; replace first downloads the current database. Separate UTF-8 CSV exports cover day totals, food entries and weight history, with CRLF rows, spreadsheet-safe text, timestamps for round-tripping multiple daily readings, and numeric values left numeric.
 
 On compatible HTTPS browsers, **Share or save backup** passes the JSON file to
 the operating system share sheet. This lets iPhone users save into Files,

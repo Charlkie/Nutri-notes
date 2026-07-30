@@ -252,6 +252,25 @@ export class NutritionDB extends Dexie {
           });
         });
       });
+    this.version(13)
+      .stores({
+        foods: "id, name, categoryId, lastLoggedAt, logCount, updatedAt, barcode",
+        catalogFoods: "id, name, categoryId, barcode, source.externalId",
+        categories: "id, sortIndex",
+        days: "id, &date, updatedAt, scheduleId",
+        entries: "id, dayId, [dayId+sortIndex], consumed",
+        templates: "id, name, updatedAt",
+        schedules: "id, templateId, start, updatedAt",
+        recipes: "id, name, categoryId, updatedAt",
+        weights: "id, date, recordedAt",
+        settings: "key",
+      })
+      .upgrade(async (tx) => {
+        await tx.table("weights").toCollection().modify((entry: WeightEntry) => {
+          entry.recordedAt ??= `${entry.date}T12:00:00`;
+          entry.source ??= "manual";
+        });
+      });
     this.on("populate", async () => {
       await this.categories.bulkAdd(seedCategories);
       await this.foods.bulkAdd(seedFoods);
@@ -852,17 +871,62 @@ export async function saveWeight(
   date: ISODate,
   weightKg: number,
   note?: string,
+  entryId?: ID,
 ): Promise<WeightEntry> {
   assertWeight(weightKg);
-  const existing = await db.weights.where("date").equals(date).first();
+  const existing = entryId
+    ? await db.weights.get(entryId)
+    : await db.weights
+        .where("date")
+        .equals(date)
+        .filter((entry) => !entry.source || entry.source === "manual")
+        .first();
+  const previousTime = existing?.recordedAt?.slice(11);
   const entry: WeightEntry = {
     id: existing?.id ?? id(),
     date,
+    recordedAt: `${date}T${previousTime || "12:00:00"}`,
     weightKg,
     note: note?.trim() || undefined,
+    source: existing?.source ?? "manual",
   };
   await db.weights.put(entry);
   return entry;
+}
+
+export async function importWeightMeasurements(
+  measurements: Array<Pick<WeightEntry, "date" | "recordedAt" | "weightKg">>,
+): Promise<{ added: number; duplicates: number }> {
+  return db.transaction("rw", db.weights, async () => {
+    const existing = await db.weights.toArray();
+    const keys = new Set(
+      existing.map(
+        (entry) =>
+          `${entry.recordedAt ?? `${entry.date}T12:00:00`}|${entry.weightKg.toFixed(4)}`,
+      ),
+    );
+    const additions: WeightEntry[] = [];
+    let duplicates = 0;
+    for (const measurement of measurements) {
+      assertWeight(measurement.weightKg);
+      const recordedAt = measurement.recordedAt ?? `${measurement.date}T12:00:00`;
+      const key = `${recordedAt}|${measurement.weightKg.toFixed(4)}`;
+      if (keys.has(key)) {
+        duplicates += 1;
+        continue;
+      }
+      keys.add(key);
+      additions.push({
+        id: id(),
+        date: measurement.date,
+        recordedAt,
+        weightKg: measurement.weightKg,
+        source: "csv",
+      });
+    }
+    if (additions.length) await db.weights.bulkAdd(additions);
+    return { added: additions.length, duplicates };
+  });
 }
 
 function assertWeight(value: number): void {

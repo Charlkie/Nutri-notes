@@ -62,6 +62,8 @@ describe("data portability", () => {
       "food_entries.csv",
       "weight.csv",
     ]);
-    expect(files["weight.csv"]).toBe("Date,Weight kg,Note\r\n");
+    expect(files["weight.csv"]).toBe(
+      "Recorded at,Date,Weight kg,Note,Source\r\n",
+    );
   });
 });

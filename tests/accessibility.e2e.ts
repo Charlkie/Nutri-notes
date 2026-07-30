@@ -402,6 +402,44 @@ test("add weight opens without focusing or zooming the numeric field", async ({ 
   await expect(weight).toHaveCSS("font-size", "16px");
 });
 
+test("weight CSV import preserves same-day readings and overlays nutrition trends", async ({ page }) => {
+  await page.goto("/#screen=day&date=2026-07-31");
+  await page.getByRole("button", { name: "Food", exact: true }).click();
+  await page.getByRole("button", { name: "Recipes", exact: true }).click();
+  await page.getByRole("button", { name: "Log", exact: true }).first().click();
+  await page.getByRole("button", { name: "Log recipe" }).click();
+
+  await page.getByRole("button", { name: "Body", exact: true }).click();
+  await page.locator('input[type="file"][accept*="csv"]').setInputFiles({
+    name: "generic-weight.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(
+      "\uFEFFTime,Person,WEIGHT (kg)\n2026-07-30 07:15:00,Test,69.1\n2026-07-31 07:10:00,Test,68.4\n2026-07-31 19:20:00,Test,69.2\n",
+    ),
+  });
+  await expect(page.getByRole("heading", { name: "Import weight data" })).toBeVisible();
+  await expect(page.getByText("3 measurements", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Date / time column")).toHaveValue("0");
+  await expect(page.getByLabel("Weight column")).toHaveValue("2");
+  await expect(page.getByLabel("Source unit")).toHaveValue("kg");
+  await expectNoSeriousViolations(page);
+  await page.getByRole("button", { name: "Import measurements" }).click();
+  await expect(page.getByText("Imported 3 weight measurements")).toBeVisible();
+  await expect(page.locator(".weight-history article")).toHaveCount(3);
+
+  await page.getByRole("button", { name: "Charts", exact: true }).click();
+  await page.getByRole("button", { name: "Trends" }).click();
+  await page.getByRole("button", { name: "Planned" }).click();
+  await page.getByRole("button", { name: "Weight" }).click();
+  await expect(page.getByText("Nutrition (kcal)")).toBeVisible();
+  await expect(page.getByText("Weight (kg)")).toBeVisible();
+  await expect(page.locator(".analytics-line .weight-series")).toBeVisible();
+  await page.getByRole("button", { name: "Min–max" }).click();
+  await expect(page.locator(".analytics-line .weight-range")).toHaveCount(2);
+  await expect(page.getByText(/whiskers show min–max/)).toBeVisible();
+  await expectNoSeriousViolations(page);
+});
+
 test("per-serving custom food logs and displays as serves", async ({ page }) => {
   await page.goto("/#screen=day&date=2026-07-27");
   await page.getByRole("button", { name: "Food", exact: true }).click();

@@ -7,6 +7,7 @@ import "./calendar.css";
 import "./body.css";
 import "./weightEditor.css";
 import "./charts.css";
+import "./weightAnalytics.css";
 import "./settings.css";
 import "./preferences.css";
 import "./hardening.css";

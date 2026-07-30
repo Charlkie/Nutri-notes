@@ -91,6 +91,7 @@ import {
   db,
   deleteCategory,
   id,
+  importWeightMeasurements,
   ensureFoodCatalog,
   importFullBackup,
   isoDate,
@@ -115,11 +116,18 @@ import {
 } from "./domain/nutrition";
 import { monthGrid } from "./domain/calendar";
 import {
+  aggregateWeightsByDay,
   displayWeight,
   weightChange,
   weightInputToKg,
   withSevenDayAverage,
 } from "./domain/body";
+import {
+  inspectWeightCsv,
+  parseWeightCsv,
+  type DateOrder,
+  type WeightCsvInspection,
+} from "./domain/weightImport";
 import {
   categoryBreakdown,
   dailyNutrition,
@@ -633,7 +641,7 @@ export default function App() {
       {route === "body" && <AuxiliaryOverlay label="Body" onMinimise={goDay}>
         <BodyScreen unit={appSettings.weightUnit} onToast={setToast} />
       </AuxiliaryOverlay>}
-      {route === "charts" && <AuxiliaryOverlay label="Charts" onMinimise={goDay}><ChartsScreen categories={categories} /></AuxiliaryOverlay>}
+      {route === "charts" && <AuxiliaryOverlay label="Charts" onMinimise={goDay}><ChartsScreen categories={categories} weightUnit={appSettings.weightUnit} /></AuxiliaryOverlay>}
       {route === "settings" && <AuxiliaryOverlay label="Settings" onMinimise={goDay}>
         <SettingsScreen
           categories={categories}
@@ -2945,13 +2953,37 @@ function BodyScreen({
   unit: WeightUnit;
   onToast: (toast: Toast) => void;
 }) {
-  const entries =
-    useLiveQuery(() => db.weights.orderBy("date").toArray(), []) ?? [];
+  const entries = useLiveQuery(() => db.weights.toArray(), []) ?? [];
+  const orderedEntries = useMemo(
+    () =>
+      [...entries].sort((a, b) =>
+        (a.recordedAt ?? `${a.date}T12:00:00`).localeCompare(
+          b.recordedAt ?? `${b.date}T12:00:00`,
+        ),
+      ),
+    [entries],
+  );
+  const importInput = useRef<HTMLInputElement>(null);
+  const [pendingImport, setPendingImport] = useState<{
+    fileName: string;
+    inspection: WeightCsvInspection;
+  }>();
   const [editing, setEditing] = useState<WeightEntry | "new">();
   const points = withSevenDayAverage(entries);
-  const latest = points.at(-1);
+  const latest = orderedEntries.at(-1);
+  const latestAverage = points.at(-1);
   const change = weightChange(entries);
   const shown = (kg: number) => displayWeight(kg, unit).toFixed(1);
+  const loadCsv = async (file?: File) => {
+    if (!file) return;
+    try {
+      setPendingImport({ fileName: file.name, inspection: inspectWeightCsv(await file.text()) });
+    } catch (error) {
+      onToast({ message: error instanceof Error ? error.message : "Could not read that CSV" });
+    } finally {
+      if (importInput.current) importInput.current.value = "";
+    }
+  };
   const remove = async (entry: WeightEntry) => {
     await db.weights.delete(entry.id);
     onToast({
@@ -2968,13 +3000,30 @@ function BodyScreen({
           <Scale />
           Body
         </span>
-        <button
-          className="icon-button"
-          aria-label="Add weight"
-          onClick={() => setEditing("new")}
-        >
-          <Plus />
-        </button>
+        <div className="body-actions">
+          <input
+            ref={importInput}
+            className="visually-hidden"
+            type="file"
+            aria-label="Weight CSV file"
+            accept=".csv,text/csv,text/plain"
+            onChange={(event) => void loadCsv(event.target.files?.[0])}
+          />
+          <button
+            className="icon-button"
+            aria-label="Import weight CSV"
+            onClick={() => importInput.current?.click()}
+          >
+            <Upload />
+          </button>
+          <button
+            className="icon-button"
+            aria-label="Add weight"
+            onClick={() => setEditing("new")}
+          >
+            <Plus />
+          </button>
+        </div>
       </header>
       {entries.length ? (
         <>
@@ -2992,7 +3041,7 @@ function BodyScreen({
             <div>
               <small>7-DAY AVERAGE</small>
               <strong>
-                {latest && shown(latest.rollingAverageKg)} <em>{unit}</em>
+                {latestAverage && shown(latestAverage.rollingAverageKg)} <em>{unit}</em>
               </strong>
               <span
                 className={
@@ -3012,7 +3061,7 @@ function BodyScreen({
               <h2>Weight history</h2>
               <span>{entries.length} entries</span>
             </header>
-            {[...entries].reverse().map((entry) => (
+            {[...orderedEntries].reverse().map((entry) => (
               <article key={entry.id}>
                 <div className="weight-date">
                   <strong>
@@ -3029,7 +3078,12 @@ function BodyScreen({
                   <strong>
                     {shown(entry.weightKg)} <small>{unit}</small>
                   </strong>
-                  {entry.note && <p>{entry.note}</p>}
+                  <p>
+                    {entry.recordedAt
+                      ? format(new Date(entry.recordedAt), "h:mm a")
+                      : "Time not recorded"}
+                    {entry.note ? ` · ${entry.note}` : entry.source === "csv" ? " · CSV import" : ""}
+                  </p>
                 </div>
                 <button
                   aria-label={`Edit weight for ${entry.date}`}
@@ -3069,6 +3123,22 @@ function BodyScreen({
           onSaved={() => {
             setEditing(undefined);
             onToast({ message: "Weight saved" });
+          }}
+        />
+      )}
+      {pendingImport && (
+        <WeightImportDialog
+          fileName={pendingImport.fileName}
+          inspection={pendingImport.inspection}
+          unit={unit}
+          onClose={() => setPendingImport(undefined)}
+          onImport={async (measurements, ignoredRows) => {
+            const result = await importWeightMeasurements(measurements);
+            setPendingImport(undefined);
+            const ignored = ignoredRows + result.duplicates;
+            onToast({
+              message: `Imported ${result.added} weight measurement${result.added === 1 ? "" : "s"}${ignored ? ` · skipped ${ignored}` : ""}`,
+            });
           }}
         />
       )}
@@ -3156,8 +3226,12 @@ function WeightEditor({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await saveWeight(date, weightInputToKg(Number(weight), unit), note);
-      if (entry && entry.date !== date) await db.weights.delete(entry.id);
+      await saveWeight(
+        date,
+        weightInputToKg(Number(weight), unit),
+        note,
+        entry?.id,
+      );
       onSaved();
     } catch (ex) {
       setError(ex instanceof Error ? ex.message : "Could not save weight");
@@ -3214,8 +3288,122 @@ function WeightEditor({
     </div>
   );
 }
+function WeightImportDialog({
+  fileName,
+  inspection,
+  unit,
+  onClose,
+  onImport,
+}: {
+  fileName: string;
+  inspection: WeightCsvInspection;
+  unit: WeightUnit;
+  onClose: () => void;
+  onImport: (
+    measurements: ReturnType<typeof parseWeightCsv>["measurements"],
+    ignoredRows: number,
+  ) => Promise<void>;
+}) {
+  const [dateColumn, setDateColumn] = useState(inspection.suggestedDateColumn);
+  const [weightColumn, setWeightColumn] = useState(inspection.suggestedWeightColumn);
+  const [sourceUnit, setSourceUnit] = useState<WeightUnit>(inspection.suggestedUnit);
+  const [dateOrder, setDateOrder] = useState<DateOrder>("dmy");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const parsed = useMemo(() => {
+    if (dateColumn < 0 || weightColumn < 0) return undefined;
+    return parseWeightCsv(inspection, { dateColumn, weightColumn, unit: sourceUnit, dateOrder });
+  }, [dateColumn, dateOrder, inspection, sourceUnit, weightColumn]);
+  const dates = parsed?.measurements.map((item) => item.date) ?? [];
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!parsed?.measurements.length) {
+      setError("No valid measurements were found with this mapping");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await onImport(
+        parsed.measurements,
+        parsed.skippedRows + parsed.duplicateRows,
+      );
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not import these measurements");
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="dialog-backdrop">
+      <form className="dialog weight-import-dialog" onSubmit={submit}>
+        <h2>Import weight data</h2>
+        <p className="import-file-name">{fileName}</p>
+        <div className="weight-import-mapping">
+          <label>
+            Date / time column
+            <select value={dateColumn} onChange={(event) => setDateColumn(Number(event.target.value))}>
+              <option value={-1}>Choose column</option>
+              {inspection.headers.map((header, index) => <option key={`${header}-${index}`} value={index}>{header}</option>)}
+            </select>
+          </label>
+          <label>
+            Weight column
+            <select value={weightColumn} onChange={(event) => setWeightColumn(Number(event.target.value))}>
+              <option value={-1}>Choose column</option>
+              {inspection.headers.map((header, index) => <option key={`${header}-${index}`} value={index}>{header}</option>)}
+            </select>
+          </label>
+          <label>
+            Source unit
+            <select value={sourceUnit} onChange={(event) => setSourceUnit(event.target.value as WeightUnit)}>
+              <option value="kg">Kilograms (kg)</option>
+              <option value="lb">Pounds (lb)</option>
+            </select>
+          </label>
+          <label>
+            Numeric date order
+            <select value={dateOrder} onChange={(event) => setDateOrder(event.target.value as DateOrder)}>
+              <option value="dmy">Day / month / year</option>
+              <option value="mdy">Month / day / year</option>
+            </select>
+          </label>
+        </div>
+        {parsed?.measurements.length ? (
+          <section className="weight-import-summary" aria-live="polite">
+            <strong>{parsed.measurements.length} measurements</strong>
+            <span>
+              {format(new Date(`${dates[0]}T12:00:00`), "d MMM yyyy")} – {format(new Date(`${dates.at(-1)}T12:00:00`), "d MMM yyyy")}
+            </span>
+            <small>
+              Preview: {parsed.measurements.slice(0, 3).map((item) => `${format(new Date(item.recordedAt), "d MMM, h:mm a")} · ${displayWeight(item.weightKg, unit).toFixed(1)} ${unit}`).join("; ")}
+            </small>
+            {(parsed.skippedRows > 0 || parsed.duplicateRows > 0) && (
+              <em>{parsed.skippedRows + parsed.duplicateRows} invalid or repeated rows will be skipped</em>
+            )}
+          </section>
+        ) : (
+          <p className="form-error">Choose matching columns to preview the import.</p>
+        )}
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <div className="dialog-actions">
+          <button type="button" onClick={onClose}>Cancel</button>
+          <button className="primary" type="submit" disabled={busy || !parsed?.measurements.length}>
+            {busy ? "Importing…" : "Import measurements"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
 type ChartPeriod = "all" | "year" | "month" | "week" | "day" | "custom";
-function ChartsScreen({ categories }: { categories: FoodCategory[] }) {
+type NutritionTrend = "calories" | "protein" | "carbohydrates" | "fat";
+function ChartsScreen({
+  categories,
+  weightUnit,
+}: {
+  categories: FoodCategory[];
+  weightUnit: WeightUnit;
+}) {
   const { unit } = useEnergyDisplay();
   const [tab, setTab] = useState<"breakdown" | "trends" | "foods">("breakdown");
   const [period, setPeriod] = useState<ChartPeriod>("all");
@@ -3226,9 +3414,10 @@ function ChartsScreen({ categories }: { categories: FoodCategory[] }) {
   const [breakdownMode, setBreakdownMode] = useState<"category" | "macros">(
     "category",
   );
-  const [trend, setTrend] = useState<
-    "calories" | "protein" | "carbohydrates" | "fat" | "weight"
-  >("calories");
+  const [trend, setTrend] = useState<NutritionTrend>("calories");
+  const [showWeight, setShowWeight] = useState(false);
+  const [weightAggregation, setWeightAggregation] = useState<"average" | "range">("average");
+  const [trendScope, setTrendScope] = useState<"consumed" | "planned">("consumed");
   const [selectedSegment, setSelectedSegment] = useState<string>();
   const analytics = useLiveQuery(async () => {
     const days = await db.days.toArray();
@@ -3293,20 +3482,19 @@ function ChartsScreen({ categories }: { categories: FoodCategory[] }) {
     : "conic-gradient(#252c31 0 100%)";
   const selected =
     breakdown.find((item) => item.id === selectedSegment) ?? breakdown[0];
-  const days = dailyNutrition(items);
+  const days = dailyNutrition(
+    trendScope === "consumed"
+      ? items.filter(({ entry }) => entry.consumed)
+      : items,
+  );
   const foodStats = foodStatistics(items);
-  const weightPoints = withSevenDayAverage(weights);
-  const trendItems =
-    trend === "weight"
-      ? weightPoints.map((point) => ({
-          date: point.date,
-          value: point.weightKg,
-          average: point.rollingAverageKg,
-        }))
-      : days.map((day) => ({
-          date: day.date,
-          value: trend === "calories" ? energyValue(day[trend], unit) : day[trend],
-        }));
+  const dailyWeights = aggregateWeightsByDay(weights);
+  const trendItems = days.map((day) => ({
+    date: day.date,
+    value: trend === "calories" ? energyValue(day[trend], unit) : day[trend],
+  }));
+  const latestNutrition = trendItems.at(-1);
+  const latestWeight = dailyWeights.at(-1);
   return (
     <main className="screen charts-screen">
       <header className="brand-bar">
@@ -3437,7 +3625,7 @@ function ChartsScreen({ categories }: { categories: FoodCategory[] }) {
         <section className="trends-screen">
           <div className="trend-metrics">
             {(
-              ["calories", "protein", "carbohydrates", "fat", "weight"] as const
+              ["calories", "protein", "carbohydrates", "fat"] as const
             ).map((metric) => (
               <button
                 key={metric}
@@ -3449,27 +3637,53 @@ function ChartsScreen({ categories }: { categories: FoodCategory[] }) {
                   : metric[0]?.toUpperCase() + metric.slice(1)}
               </button>
             ))}
+            <button
+              className={showWeight ? "active weight-active" : ""}
+              aria-pressed={showWeight}
+              onClick={() => setShowWeight((current) => !current)}
+            >
+              <Scale />
+              Weight
+            </button>
           </div>
-          {trendItems.length ? (
-            <>
-              <div className="trend-heading">
-                <span>
-                  {trend === "weight" ? "Body weight" : `Daily ${trend}`}
-                </span>
-                <strong>
-                  {trendItems
-                    .at(-1)
-                    ?.value.toFixed(trend === "calories" ? 0 : 1)}{" "}
-                  {trend === "calories"
-                    ? unit
-                    : trend === "weight"
-                      ? "kg"
-                      : "g"}
-                </strong>
+          <div className="trend-options">
+            <div className="compact-toggle" aria-label="Nutrition totals">
+              <button className={trendScope === "consumed" ? "active" : ""} onClick={() => setTrendScope("consumed")}>Consumed</button>
+              <button className={trendScope === "planned" ? "active" : ""} onClick={() => setTrendScope("planned")}>Planned</button>
+            </div>
+            {showWeight && (
+              <div className="compact-toggle" aria-label="Daily weight calculation">
+                <button className={weightAggregation === "average" ? "active" : ""} onClick={() => setWeightAggregation("average")}>Average</button>
+                <button className={weightAggregation === "range" ? "active" : ""} onClick={() => setWeightAggregation("range")}>Min–max</button>
               </div>
-              <SimpleLineChart
-                items={trendItems}
-                secondary={trend === "weight"}
+            )}
+          </div>
+          {trendItems.length || (showWeight && dailyWeights.length) ? (
+            <>
+              <div className="trend-heading combined-heading">
+                <div>
+                  <span>{trendScope === "consumed" ? "Consumed" : "Planned"} {trend === "carbohydrates" ? "carbs" : trend}</span>
+                  <strong>{latestNutrition ? `${latestNutrition.value.toFixed(trend === "calories" ? 0 : 1)} ${trend === "calories" ? unit : "g"}` : "No data"}</strong>
+                </div>
+                {showWeight && (
+                  <div className="weight-heading">
+                    <span>Daily weight {weightAggregation === "range" ? "range" : "average"}</span>
+                    <strong>
+                      {latestWeight
+                        ? weightAggregation === "range"
+                          ? `${displayWeight(latestWeight.minKg, weightUnit).toFixed(1)}–${displayWeight(latestWeight.maxKg, weightUnit).toFixed(1)} ${weightUnit}`
+                          : `${displayWeight(latestWeight.averageKg, weightUnit).toFixed(1)} ${weightUnit}`
+                        : "No data"}
+                    </strong>
+                  </div>
+                )}
+              </div>
+              <CombinedTrendChart
+                nutrition={trendItems}
+                nutritionUnit={trend === "calories" ? unit : "g"}
+                weights={showWeight ? dailyWeights : []}
+                weightUnit={weightUnit}
+                weightAggregation={weightAggregation}
               />
             </>
           ) : (
@@ -3510,60 +3724,84 @@ function ChartsScreen({ categories }: { categories: FoodCategory[] }) {
     </main>
   );
 }
-function SimpleLineChart({
-  items,
-  secondary,
+function CombinedTrendChart({
+  nutrition,
+  nutritionUnit,
+  weights,
+  weightUnit,
+  weightAggregation,
 }: {
-  items: {
-    date: string;
-    value: number;
-    average?: number;
-  }[];
-  secondary?: boolean;
+  nutrition: { date: string; value: number }[];
+  nutritionUnit: string;
+  weights: ReturnType<typeof aggregateWeightsByDay>;
+  weightUnit: WeightUnit;
+  weightAggregation: "average" | "range";
 }) {
-  const values = items.flatMap((item) =>
-    secondary && item.average !== undefined
-      ? [item.value, item.average]
-      : [item.value],
-  );
-  const min = Math.min(...values),
-    max = Math.max(...values),
-    range = Math.max(max - min, 1);
-  const point = (value: number, index: number) =>
-    `${18 + (index / Math.max(items.length - 1, 1)) * 324},${122 - ((value - min) / range) * 88}`;
-  const line = items.map((item, index) => point(item.value, index)).join(" ");
-  const average = secondary
-    ? items
-        .map((item, index) => point(item.average ?? item.value, index))
-        .join(" ")
-    : undefined;
+  const dates = [...new Set([...nutrition.map((item) => item.date), ...weights.map((item) => item.date)])].sort();
+  const x = (date: string) => {
+    const index = dates.indexOf(date);
+    return dates.length === 1 ? 180 : 38 + (index / (dates.length - 1)) * 284;
+  };
+  const nutritionMax = Math.max(...nutrition.map((item) => item.value), 1);
+  const nutritionY = (value: number) => 122 - (value / nutritionMax) * 88;
+  const displayedWeightValues = weights.flatMap((item) => [
+    displayWeight(item.minKg, weightUnit),
+    displayWeight(item.maxKg, weightUnit),
+  ]);
+  const weightMin = displayedWeightValues.length ? Math.min(...displayedWeightValues) : 0;
+  const weightMax = displayedWeightValues.length ? Math.max(...displayedWeightValues) : 1;
+  const weightPadding = Math.max((weightMax - weightMin) * 0.12, weightUnit === "kg" ? 0.3 : 0.7);
+  const weightFloor = weightMin - weightPadding;
+  const weightCeiling = weightMax + weightPadding;
+  const weightRange = Math.max(weightCeiling - weightFloor, 1);
+  const weightY = (valueKg: number) =>
+    122 - ((displayWeight(valueKg, weightUnit) - weightFloor) / weightRange) * 88;
+  const nutritionLine = nutrition.map((item) => `${x(item.date)},${nutritionY(item.value)}`).join(" ");
+  const weightLine = weights.map((item) => `${x(item.date)},${weightY(item.averageKg)}`).join(" ");
   return (
     <div className="analytics-line">
       <svg
         viewBox="0 0 360 150"
         role="img"
-        aria-label={`Trend with ${items.length} data points`}
+        aria-label={`Combined trend with ${nutrition.length} nutrition days and ${weights.length} weight days`}
       >
-        <line x1="18" y1="34" x2="342" y2="34" />
-        <line x1="18" y1="78" x2="342" y2="78" />
-        <line x1="18" y1="122" x2="342" y2="122" />
-        {average && <polyline className="secondary" points={average} />}
-        <polyline points={line} />
-        {items.map((item, index) => (
-          <circle
-            key={`${item.date}-${index}`}
-            cx={18 + (index / Math.max(items.length - 1, 1)) * 324}
-            cy={122 - ((item.value - min) / range) * 88}
-            r="3"
-          />
+        <line x1="38" y1="34" x2="322" y2="34" />
+        <line x1="38" y1="78" x2="322" y2="78" />
+        <line x1="38" y1="122" x2="322" y2="122" />
+        {nutrition.length > 1 && <polyline className="nutrition-series" points={nutritionLine} />}
+        {nutrition.map((item) => <circle className="nutrition-dot" key={`nutrition-${item.date}`} cx={x(item.date)} cy={nutritionY(item.value)} r="3" />)}
+        {weights.length > 1 && <polyline className="weight-series" points={weightLine} />}
+        {weightAggregation === "range" && weights.map((item) => (
+          <g className="weight-range" key={`range-${item.date}`}>
+            <line x1={x(item.date)} x2={x(item.date)} y1={weightY(item.maxKg)} y2={weightY(item.minKg)} />
+            <line x1={x(item.date) - 4} x2={x(item.date) + 4} y1={weightY(item.maxKg)} y2={weightY(item.maxKg)} />
+            <line x1={x(item.date) - 4} x2={x(item.date) + 4} y1={weightY(item.minKg)} y2={weightY(item.minKg)} />
+          </g>
         ))}
+        {weights.map((item) => <circle className="weight-dot" key={`weight-${item.date}`} cx={x(item.date)} cy={weightY(item.averageKg)} r="3" />)}
+        {nutrition.length > 0 && (
+          <>
+            <text className="nutrition-axis" x="34" y="38" textAnchor="end">{nutritionMax.toFixed(nutritionUnit === "g" ? 1 : 0)}</text>
+            <text className="nutrition-axis" x="34" y="126" textAnchor="end">0</text>
+          </>
+        )}
+        {weights.length > 0 && (
+          <>
+            <text className="weight-axis" x="326" y="38">{weightCeiling.toFixed(1)}</text>
+            <text className="weight-axis" x="326" y="126">{weightFloor.toFixed(1)}</text>
+          </>
+        )}
       </svg>
       <div>
-        <span>{format(new Date(`${items[0]?.date}T12:00:00`), "d MMM")}</span>
+        <span>{format(new Date(`${dates[0]}T12:00:00`), "d MMM")}</span>
         <span>
-          {format(new Date(`${items.at(-1)?.date}T12:00:00`), "d MMM")}
+          {format(new Date(`${dates.at(-1)}T12:00:00`), "d MMM")}
         </span>
       </div>
+      <p className="chart-legend">
+        {nutrition.length > 0 && <span><i className="nutrition-key" />Nutrition ({nutritionUnit})</span>}
+        {weights.length > 0 && <span><i className="weight-key" />Weight ({weightUnit}){weightAggregation === "range" ? " · whiskers show min–max" : ""}</span>}
+      </p>
     </div>
   );
 }

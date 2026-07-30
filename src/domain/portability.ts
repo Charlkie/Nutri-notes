@@ -172,8 +172,10 @@ const backupSchema = z.object({
     z.object({
       id: z.string(),
       date: z.string(),
+      recordedAt: z.string().optional(),
       weightKg: z.number().positive(),
       note: z.string().optional(),
+      source: z.enum(["manual", "csv"]).optional(),
     }),
   ),
   settings: z.record(z.string(), z.unknown()),
@@ -279,12 +281,14 @@ export function createCsvExports(
       entry.sortIndex,
     ]);
   const weightRows: (string | number | boolean | undefined)[][] = [
-    ["Date", "Weight kg", "Note"],
+    ["Recorded at", "Date", "Weight kg", "Note", "Source"],
     ...[...data.weights]
-      .sort((a, b) => a.date.localeCompare(b.date))
+      .sort((a, b) =>
+        (a.recordedAt ?? a.date).localeCompare(b.recordedAt ?? b.date),
+      )
       .map(
         (weight) =>
-          [weight.date, weight.weightKg, weight.note] as (
+          [weight.recordedAt, weight.date, weight.weightKg, weight.note, weight.source] as (
             string | number | undefined
           )[],
       ),
