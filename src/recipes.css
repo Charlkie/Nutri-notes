@@ -291,6 +291,25 @@
   box-shadow: 0 0 0 1px var(--blue);
 }
 
+.ingredient-quantity select {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  width: 48px;
+  height: 32px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 750;
+  padding: 0 3px;
+}
+
+.ingredient-quantity:has(select) input {
+  padding-right: 55px;
+}
+
 .recipe-builder:has(.recipe-ingredient-toolbar),
 .recipe-instance:has(.recipe-ingredient-toolbar) {
   padding-bottom: calc(90px + var(--safe-bottom));

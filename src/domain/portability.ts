@@ -110,6 +110,7 @@ const backupSchema = z.object({
             id: z.string(),
             foodId: z.string(),
             quantity: z.number().positive(),
+            unit: z.enum(["g", "ml", "serving", "slice", "item", "scoop"]).optional(),
             sortIndex: z.number().nonnegative(),
             group: z.string().optional(),
           }),

@@ -73,6 +73,28 @@ test("horizontal swipes change days and secondary screens minimise to the tracke
   await expect(page.getByRole("button",{name:"Minimise Body"})).toHaveCount(0);
 });
 
+test("the tracking page contains vertical scrolling above the bottom navigation",async({page})=>{
+  await page.goto("/#screen=day&date=2026-07-27");
+  const screen=page.locator(".day-carousel-panel:not([aria-hidden]) .day-screen");
+  await screen.waitFor();
+  const metrics=await page.evaluate(()=>({
+    viewport:window.innerHeight,
+    documentHeight:document.documentElement.scrollHeight,
+    bodyHeight:document.body.scrollHeight,
+    windowScroll:window.scrollY,
+  }));
+  expect(metrics.documentHeight).toBeLessThanOrEqual(metrics.viewport+1);
+  expect(metrics.bodyHeight).toBeLessThanOrEqual(metrics.viewport+1);
+  expect(metrics.windowScroll).toBe(0);
+  const contained=await screen.evaluate(element=>{
+    element.scrollTop=element.scrollHeight;
+    return {clientHeight:element.clientHeight,scrollHeight:element.scrollHeight,scrollTop:element.scrollTop};
+  });
+  expect(contained.clientHeight).toBe(metrics.viewport);
+  expect(contained.scrollTop).toBeGreaterThan(0);
+  expect(await page.evaluate(()=>window.scrollY)).toBe(0);
+});
+
 test("calendar presents a vertically scrollable run of months",async({page})=>{
   await page.goto("/#screen=calendar&date=2026-07-27");
   const months=page.locator(".calendar-month-scroll");
@@ -103,6 +125,13 @@ test("food and recipe picker has labelled, accessible controls", async ({ page }
   await page.getByPlaceholder("Food name, brand or category").fill("Quick oats");
   await page.locator(".recipe-ingredient-picker .food-select").filter({ hasText: "Quick oats" }).click();
   await expect(page.getByRole("spinbutton", { name: "Quantity for Quick oats" })).toBeVisible();
+  await page.getByRole("button", { name: "Add ingredient", exact: true }).click();
+  await page.getByPlaceholder("Food name, brand or category").fill("Milk cow fluid regular fat");
+  await page.locator(".recipe-ingredient-picker .food-select").filter({ hasText: "Milk, cow, fluid, regular fat" }).first().click();
+  const milkUnit=page.getByRole("combobox",{name:/Unit for Milk, cow, fluid, regular fat/});
+  await expect(milkUnit).toHaveValue("g");
+  await milkUnit.selectOption("ml");
+  await expect(milkUnit).toHaveValue("ml");
   await expect(page.getByLabel("Preparation steps")).toHaveCSS("font-size", "16px");
 });
 

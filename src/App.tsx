@@ -308,6 +308,10 @@ export default function App() {
     root.style.setProperty("--accent", appSettings.accentColour);
   }, [appSettings]);
   useEffect(() => {
+    document.documentElement.classList.toggle("tracking-scroll-locked", route === "day");
+    return () => document.documentElement.classList.remove("tracking-scroll-locked");
+  }, [route]);
+  useEffect(() => {
     if (!isPrimaryRoute(route)) return;
     const next = navigationHash(route, date);
     if (location.hash !== next) history.replaceState(null, "", next);
@@ -464,7 +468,7 @@ export default function App() {
         void saveAppSettings({ ...appSettings, energyUnit });
       }}
     >
-    <div ref={appShellRef} className="app-shell" onKeyDownCapture={clearZeroForEditing} onBeforeInputCapture={clearZeroBeforeInput} onClickCapture={event=>{const target=event.target as Node;const swiped=suppressSwipeClickTarget.current;if(performance.now()<suppressSwipeClickUntil.current&&swiped&&(swiped===target||swiped.contains(target))){event.preventDefault();event.stopPropagation();suppressSwipeClickTarget.current=undefined}}}>
+    <div ref={appShellRef} className={`app-shell ${route === "day" ? "tracking-active" : ""}`} onKeyDownCapture={clearZeroForEditing} onBeforeInputCapture={clearZeroBeforeInput} onClickCapture={event=>{const target=event.target as Node;const swiped=suppressSwipeClickTarget.current;if(performance.now()<suppressSwipeClickUntil.current&&swiped&&(swiped===target||swiped.contains(target))){event.preventDefault();event.stopPropagation();suppressSwipeClickTarget.current=undefined}}}>
       {isPrimaryRoute(route) && (
         <div className="tracking-layer" aria-hidden={route!=="day"||undefined} ref={element=>{if(element)element.inert=route!=="day"}}>
           <div className="day-carousel">

@@ -63,6 +63,7 @@ export interface RecipeIngredient {
   id: ID;
   foodId: ID;
   quantity: number;
+  unit?: FoodUnit;
   sortIndex: number;
   group?: string;
 }

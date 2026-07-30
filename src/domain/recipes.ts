@@ -1,12 +1,13 @@
 import type { DayFoodEntry, Food, FoodSnapshot, LoggedRecipe, Nutrients, Recipe } from "./types";
 import { createSnapshot, emptyNutrients } from "./nutrition";
 import { createId } from "./id";
+import { convertFoodQuantity } from "./foodUnits";
 
 export function buildLoggedRecipe(recipe:Recipe, foods:Food[], loggedServings:number):{snapshot:FoodSnapshot;recipe:LoggedRecipe}{
   if(!Number.isFinite(loggedServings)||loggedServings<=0)throw new Error("Servings must be greater than zero");
   if(!recipe.ingredients.length)throw new Error("Add at least one ingredient");
   const byId=new Map(foods.map(food=>[food.id,food]));const factor=loggedServings/recipe.yieldServings;
-  const ingredients=[...recipe.ingredients].sort((a,b)=>a.sortIndex-b.sortIndex).map(item=>{const food=byId.get(item.foodId);if(!food)throw new Error(`Missing ingredient for ${recipe.name}`);return {id:item.id,enabled:true,snapshot:createSnapshot(food,item.quantity*factor),group:item.group}});
+  const ingredients=[...recipe.ingredients].sort((a,b)=>a.sortIndex-b.sortIndex).map(item=>{const food=byId.get(item.foodId);if(!food)throw new Error(`Missing ingredient for ${recipe.name}`);const quantity=convertFoodQuantity(food,item.quantity,item.unit??food.baseUnit,food.baseUnit);return {id:item.id,enabled:true,snapshot:createSnapshot(food,quantity*factor),group:item.group}});
   const logged:LoggedRecipe={recipeId:recipe.id,yieldServings:recipe.yieldServings,loggedServings,ingredients,instructions:recipe.instructions?[...recipe.instructions]:undefined};
   return {recipe:logged,snapshot:recipeSnapshot(recipe,logged)};
 }

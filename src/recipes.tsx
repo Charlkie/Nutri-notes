@@ -8,6 +8,7 @@ import { addRecipeToDay, db, id, saveRecipe, updateLoggedRecipeEntry } from "./d
 import { recipeIngredientsFromLogged, recipeSnapshot, scaleLoggedRecipe } from "./domain/recipes";
 import { createSnapshot, roundMacro } from "./domain/nutrition";
 import { foodSearchScore,matchesFoodSearch } from "./domain/foodSearch";
+import { convertFoodQuantity, foodDensity } from "./domain/foodUnits";
 import { EnergyText } from "./energyDisplay";
 import { NumericInput } from "./NumericInput";
 import type { DayFoodEntry, Food, FoodCategory, FoodUnit, ISODate, LoggedRecipe, LoggedRecipeIngredient, Recipe, RecipeIngredient } from "./domain/types";
@@ -111,7 +112,7 @@ function RecipeBuilder({ recipe, foods, categories, onClose }: {
       {error && <p className="form-error" role="alert">{error}</p>}
       <div className="recipe-fields"><label>Recipe name<input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Spaghetti bolognese"/></label><div><label>Category<select value={categoryId} onChange={e => setCategoryId(e.target.value)}>{categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label>Recipe yield<input type="number" min="0.1" step="0.1" inputMode="decimal" value={yieldServings} onChange={e => setYieldServings(e.target.value)}/><small>servings</small></label></div></div>
       <div className="ingredient-heading"><strong>Ingredients</strong><span>{ingredients.length}</span></div>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={({active})=>setSelectedId(String(active.id))} onDragEnd={dragEnd}><SortableContext items={ingredients.map(item=>item.id)} strategy={verticalListSortingStrategy}><div className="recipe-ingredients">{ingredients.map((item,index)=>{const food=foods.find(candidate=>candidate.id===item.foodId);return <SavedIngredientRow key={item.id} item={item} food={food} editing={selectedId!==undefined} selected={selectedId===item.id} categoryColour={categories.find(category=>category.id===food?.categoryId)?.colour} onSelect={()=>setSelectedId(item.id)} onQuantity={value=>setIngredients(current=>current.map((ingredient,i)=>i===index?{...ingredient,quantity:value}:ingredient))} onGroup={group=>setIngredients(current=>current.map((ingredient,i)=>i===index?{...ingredient,group}:ingredient))}/>})}</div></SortableContext></DndContext>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={({active})=>setSelectedId(String(active.id))} onDragEnd={dragEnd}><SortableContext items={ingredients.map(item=>item.id)} strategy={verticalListSortingStrategy}><div className="recipe-ingredients">{ingredients.map((item,index)=>{const food=foods.find(candidate=>candidate.id===item.foodId);return <SavedIngredientRow key={item.id} item={item} food={food} editing={selectedId!==undefined} selected={selectedId===item.id} categoryColour={categories.find(category=>category.id===food?.categoryId)?.colour} onSelect={()=>setSelectedId(item.id)} onQuantity={value=>setIngredients(current=>current.map((ingredient,i)=>i===index?{...ingredient,quantity:value}:ingredient))} onUnit={unit=>setIngredients(current=>current.map((ingredient,i)=>{if(i!==index||!food)return ingredient;const from=ingredient.unit??food.baseUnit;return {...ingredient,unit,quantity:Math.round(convertFoodQuantity(food,ingredient.quantity,from,unit)*10)/10}}))} onGroup={group=>setIngredients(current=>current.map((ingredient,i)=>i===index?{...ingredient,group}:ingredient))}/>})}</div></SortableContext></DndContext>
       <button className="add-another recipe-add-ingredient" onClick={()=>setChoosingFood(true)}><Plus />Add ingredient</button>
       <label className="recipe-instructions">Preparation steps <small>One step per line</small><textarea rows={4} value={instructions} onChange={e=>setInstructions(e.target.value)} placeholder={"Cook the pasta.\nPrepare the sauce.\nCombine and serve."}/></label>
       <label className="recipe-notes">Notes (optional)<textarea rows={2} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Substitutions, storage, or serving notes"/></label>
@@ -121,12 +122,14 @@ function RecipeBuilder({ recipe, foods, categories, onClose }: {
     </section>;
 }
 
-function SavedIngredientRow({item,food,categoryColour,editing,selected,onSelect,onQuantity,onGroup}:{item:RecipeIngredient;food?:Food;categoryColour?:string;editing:boolean;selected:boolean;onSelect:()=>void;onQuantity:(value:number)=>void;onGroup:(value:string)=>void}) {
+function SavedIngredientRow({item,food,categoryColour,editing,selected,onSelect,onQuantity,onUnit,onGroup}:{item:RecipeIngredient;food?:Food;categoryColour?:string;editing:boolean;selected:boolean;onSelect:()=>void;onQuantity:(value:number)=>void;onUnit:(value:FoodUnit)=>void;onGroup:(value:string)=>void}) {
   const {attributes,listeners,setNodeRef,transform,transition,isDragging}=useSortable({id:item.id});
   const cardActivation=editing?{}:listeners;
+  const unit=item.unit??food?.baseUnit??"g";
+  const hasVolumeConversion=Boolean(food&&foodDensity(food));
   return <div ref={setNodeRef} onClick={editing?onSelect:undefined} {...cardActivation} className={`ingredient-card ${editing?"editing":""} ${selected?"selected":""} ${isDragging?"ingredient-dragging":""}`} style={{"--cat":categoryColour,transform:CSS.Transform.toString(transform),transition} as React.CSSProperties}>
     <span><strong>{food?.name??"Missing food"}</strong><small>{food?.calculationMode==="per100"?`per ${food.baseQuantity} ${food.baseUnit}`:food?.servingDescription??food?.baseUnit}</small></span>
-    <label><span className="sr-only">Quantity for {food?.name}</span><NumericInput min="0.01" step="any" inputMode="decimal" value={item.quantity} onValueChange={onQuantity}/><small>{food?.baseUnit}</small></label>
+    <label className="ingredient-quantity"><span className="sr-only">Quantity for {food?.name}</span><NumericInput min="0.01" step="any" inputMode="decimal" value={item.quantity} onValueChange={onQuantity}/>{hasVolumeConversion?<select aria-label={`Unit for ${food?.name}`} value={unit} onChange={event=>onUnit(event.target.value as FoodUnit)}><option value="g">g</option><option value="ml">mL</option></select>:<small>{unit==="ml"?"mL":unit}</small>}</label>
     <label className="ingredient-group"><span className="sr-only">Group for {food?.name}</span><input value={item.group??""} onChange={e=>onGroup(e.target.value)} placeholder="Group (optional), e.g. Sauce"/></label>
     {editing&&<div className="ingredient-drag-actions"><button className="ingredient-grip" aria-label={`Reorder ${food?.name??"ingredient"}`} {...attributes} {...listeners}><GripVertical/></button></div>}
   </div>;
