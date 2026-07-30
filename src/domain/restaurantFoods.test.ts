@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { restaurantNames,searchRestaurantFoods } from "./restaurantFoods";
 
 describe("Australian restaurant catalogue", () => {
-  it("finds the Oporto Chicken Rappa offline", () => expect(searchRestaurantFoods("chicken rappa")[0]).toMatchObject({ restaurant: "Oporto", name: "Chicken Rappa", calories: 420, protein: 27, carbohydrates: 34, fat: 19 }));
+  it("finds the official Oporto Chicken Rappa without fabricating unpublished macros", () => expect(searchRestaurantFoods("chicken rappa","Oporto")[0]).toMatchObject({ restaurant: "Oporto", name: "Chicken Rappa", calories: 421, unavailableNutrients: ["protein","carbohydrates","fat","fibre"] }));
   it("searches by restaurant name", () => expect(searchRestaurantFoods("oporto").length).toBeGreaterThan(1));
   it("does not return a restaurant's item for another restaurant", () => expect(searchRestaurantFoods("big mac","Oporto")).toEqual([]));
   it("matches natural multi-word searches across punctuation",()=>expect(searchRestaurantFoods("chicken classic 6-inch","Subway")[0]?.name).toBe("Chicken Classic (6-inch sub)"));
@@ -31,6 +31,17 @@ describe("Australian restaurant catalogue", () => {
     expect(burger?.calories).toBeCloseTo(1874/4.184);
     expect(burger?.notes).toContain("1874 kJ");
     expect(menu.every(item=>item.source?.sourceUrl==="https://www.kfc.com.au/nutrition-allergen")).toBe(true);
+  });
+  it("includes current official Oporto and Red Rooster ordering menus",()=>{
+    const oporto=searchRestaurantFoods("","Oporto");
+    const redRooster=searchRestaurantFoods("","Red Rooster");
+    expect(oporto).toHaveLength(152);
+    expect(redRooster).toHaveLength(188);
+    expect(searchRestaurantFoods("chicken rappa","Oporto")[0]).toMatchObject({name:"Chicken Rappa",calories:421});
+    expect(searchRestaurantFoods("reds burger","Red Rooster")[0]).toMatchObject({name:"Reds Burger",calories:798});
+    expect(oporto[0]?.source?.datasetVersion).toContain("2026-07-29");
+    expect(redRooster[0]?.source?.datasetVersion).toContain("2026-07-29");
+    expect([...oporto,...redRooster].every(item=>item.unavailableNutrients?.includes("protein"))).toBe(true);
   });
   it("includes the full generated Hungry Jack's Australian catalogue",()=>{
     const menu=searchRestaurantFoods("","Hungry Jack's");

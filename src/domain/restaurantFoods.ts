@@ -3,38 +3,14 @@ import { gygMenu } from "./gygMenu.generated";
 import { hungryJacksMenu } from "./hungryJacksMenu.generated";
 import { kfcMenu } from "./kfcMenu.generated";
 import { mcdonaldsMenu } from "./mcdonaldsMenu.generated";
+import { oportoMenu, oportoMenuSource } from "./oportoMenu.generated";
+import { redRoosterMenu, redRoosterMenuSource } from "./redRoosterMenu.generated";
 import { subwayMenu } from "./subwayMenu.generated";
 
 export interface RestaurantFood extends FoodDraft {
   restaurant: string;
   servingGrams?: number;
 }
-
-const oportoSource = {
-  kind: "restaurant" as const,
-  provider: "Oporto Australia nutrition information",
-  datasetVersion: "Checked July 2026",
-  importedAt: "2026-07-29T00:00:00.000Z",
-  sourceUrl: "https://www.oporto.com.au/nutrition-and-allergens/",
-};
-
-const oporto = (name: string, grams: number | undefined, calories: number, protein: number, carbohydrates: number, fat: number): RestaurantFood => ({
-  restaurant: "Oporto",
-  name,
-  brand: "Oporto",
-  categoryId: "other",
-  calculationMode: "perServing",
-  baseQuantity: 1,
-  baseUnit: "serving",
-  servingDescription: grams ? `1 serve (${grams} g)` : "1 serve",
-  servingGrams: grams,
-  calories,
-  protein,
-  carbohydrates,
-  fat,
-  notes: "Bundled Australian restaurant data — menu recipes and hand-portioned serves can change. Verify against the restaurant's current information.",
-  source: oportoSource,
-});
 
 const nandosSource={kind:"restaurant" as const,provider:"Nando's Australia nutritional information",datasetVersion:"Checked July 2026",importedAt:"2026-07-30T00:00:00.000Z",sourceUrl:"https://www.nandos.com.au/menu-item"};
 const nandos=(name:string,grams:number,calories:number,protein:number,carbohydrates:number,fat:number):RestaurantFood=>({restaurant:"Nando's",name,brand:"Nando's",categoryId:"other",calculationMode:"perServing",baseQuantity:1,baseUnit:"serving",servingDescription:`1 serve (${grams} g)`,servingGrams:grams,calories,protein,carbohydrates,fat,notes:"Bundled from Nando's Australia published nutrition information. Menu recipes and portions can change; verify against the current restaurant listing.",source:nandosSource});
@@ -112,6 +88,54 @@ const kfcFoods: RestaurantFood[] = kfcMenu.map(([name, kilojoules]) => ({
     datasetVersion: "Official online menu captured 30 July 2026; page nutrition notice dated September 2023",
     importedAt: "2026-07-30T00:00:00.000Z",
     sourceUrl: kfcSourceUrl,
+  },
+}));
+
+const oportoFoods: RestaurantFood[] = oportoMenu.map(([name, kilojoules, calories, sourceCategory]) => ({
+  restaurant: "Oporto",
+  name,
+  brand: "Oporto",
+  categoryId: "other",
+  calculationMode: "perServing",
+  baseQuantity: 1,
+  baseUnit: "serving",
+  servingDescription: "1 configured menu item",
+  calories,
+  protein: 0,
+  carbohydrates: 0,
+  fat: 0,
+  unavailableNutrients: ["protein", "carbohydrates", "fat", "fibre"],
+  notes: `Oporto's official ${oportoMenuSource.storeName} pickup feed publishes ${kilojoules} kJ for this ${sourceCategory} item. Catalogue-level macros were not published and are intentionally unavailable. Store configurations and promotions can vary.`,
+  source: {
+    kind: "restaurant",
+    provider: "Oporto Australia official ordering menu",
+    datasetVersion: `Pickup menu updated ${oportoMenuSource.menuUpdatedAt}`,
+    importedAt: "2026-07-30T00:00:00.000Z",
+    sourceUrl: oportoMenuSource.sourcePage,
+  },
+}));
+
+const redRoosterFoods: RestaurantFood[] = redRoosterMenu.map(([name, kilojoules, calories, sourceCategory]) => ({
+  restaurant: "Red Rooster",
+  name,
+  brand: "Red Rooster",
+  categoryId: "other",
+  calculationMode: "perServing",
+  baseQuantity: 1,
+  baseUnit: "serving",
+  servingDescription: "1 configured menu item",
+  calories,
+  protein: 0,
+  carbohydrates: 0,
+  fat: 0,
+  unavailableNutrients: ["protein", "carbohydrates", "fat", "fibre"],
+  notes: `Red Rooster's official ${redRoosterMenuSource.storeName} pickup feed publishes ${kilojoules} kJ for this ${sourceCategory} item. Catalogue-level macros were not published and are intentionally unavailable. Store configurations and promotions can vary.`,
+  source: {
+    kind: "restaurant",
+    provider: "Red Rooster Australia official ordering menu",
+    datasetVersion: `Pickup menu updated ${redRoosterMenuSource.menuUpdatedAt}`,
+    importedAt: "2026-07-30T00:00:00.000Z",
+    sourceUrl: redRoosterMenuSource.sourcePage,
   },
 }));
 
@@ -196,17 +220,11 @@ export const restaurantFoods: RestaurantFood[] = [
   mcdonaldsDessert("Birthday Cake – Ice Cream Cake", "1 slice (44 g)", 44, 81, 0.8, 12.5, 2.9),
   mcdonaldsDessert("Honey", "1 packet (13 g)", 13, 44, 0, 10.8, 0),
   ...kfcFoods,
+  ...redRoosterFoods,
+  ...oportoFoods,
   ...hungryJacksFoods,
   ...subwayFoods,
   ...gygFoods,
-  oporto("Chicken Rappa", 276, 420, 27, 34, 19),
-  oporto("Chicken Rappsnacker", 160, 340, 17, 44, 10),
-  oporto("Quarter Chicken", 179, 300, 42, 3, 13),
-  oporto("Chicken Salad Bowl", 325, 530, 46, 28, 20),
-  oporto("Chips (Regular)", 150, 360, 6, 46, 16),
-  oporto("Crispy Chicken Strips (3 Pieces)", 155, 380, 31, 15, 22),
-  oporto("Spicy Rice (Single)", 170, 230, 4, 41, 5),
-  oporto("Portuguese Salad (Single)", 160, 30, 2, 4, 0),
   nandos("Half PERi-PERi Chicken",460,715,108,1.1,30.8),
   nandos("Supremo Chicken Wrap",332,648,41.9,52.5,28.9),
 ];
