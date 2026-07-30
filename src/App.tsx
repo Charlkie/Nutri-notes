@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { flushSync } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   addDays,
@@ -97,6 +97,7 @@ import {
   reorderCategory,
   reorderDayEntries,
   reorderTemplateItems,
+  refreshFoodEntriesForDay,
   replaceFoodEntry,
   saveAppSettings,
   saveWeight,
@@ -137,7 +138,7 @@ import { scheduledTemplateDates } from "./domain/templates";
 import { energyValue } from "./domain/energy";
 import { per100Units, servingUnits, unitForMode } from "./domain/foodUnits";
 import { foodUnitLabel, formatFoodQuantity } from "./domain/foodQuantity";
-import { matchesFoodSearch } from "./domain/foodSearch";
+import { foodSearchScore, matchesFoodSearch } from "./domain/foodSearch";
 import { EnergyDisplayProvider, EnergyText, useEnergyDisplay } from "./energyDisplay";
 import { EnergyInput } from "./energyInput";
 import { NumericInput } from "./NumericInput";
@@ -207,6 +208,55 @@ function useDay(date: ISODate) {
     };
   }, [date]);
 }
+function DayCarouselPanel({
+  dayDate,
+  dayValue,
+  active,
+  categories,
+  settings,
+  onMoveDate,
+  onPick,
+  onTemplates,
+  onCopy,
+  onEdit,
+  onToast,
+}: {
+  dayDate: ISODate;
+  dayValue: Date;
+  active: boolean;
+  categories: FoodCategory[];
+  settings: AppSettings;
+  onMoveDate: (date: Date) => void;
+  onPick: () => void;
+  onTemplates: () => void;
+  onCopy: (date: ISODate) => Promise<void>;
+  onEdit: (entry: DayFoodEntry) => void;
+  onToast: (toast: Toast) => void;
+}) {
+  const dayData = useDay(dayDate);
+  return (
+    <div
+      className="day-carousel-panel"
+      aria-hidden={active ? undefined : "true"}
+      ref={element => { if (element) element.inert = !active; }}
+    >
+      <DayScreen
+        date={dayDate}
+        selectedDate={dayValue}
+        data={dayData}
+        active={active}
+        categories={categories}
+        settings={settings}
+        onMoveDate={onMoveDate}
+        onPick={onPick}
+        onTemplates={onTemplates}
+        onCopy={() => onCopy(dayDate)}
+        onEdit={onEdit}
+        onToast={onToast}
+      />
+    </div>
+  );
+}
 export default function App() {
   const initialNavigation = useMemo(
     () => parseNavigationHash(location.hash, isoDate(new Date())),
@@ -231,11 +281,8 @@ export default function App() {
   const dropbox = useDropboxBackup();
   const googleDrive = useGoogleDriveBackup(route === "settings");
   const date = isoDate(selectedDate);
-  const data = useDay(date);
   const previousDate = isoDate(subDays(selectedDate, 1));
   const nextDate = isoDate(addDays(selectedDate, 1));
-  const previousData = useDay(previousDate);
-  const nextData = useDay(nextDate);
   routeRef.current = route;
   const categories =
     useLiveQuery(() => db.categories.orderBy("sortIndex").toArray(), []) ?? [];
@@ -385,32 +432,21 @@ export default function App() {
     event.preventDefault();
     input.value="";
   };
-  const renderDay = (
-    dayDate: ISODate,
-    dayValue: Date,
-    dayData: ReturnType<typeof useDay>,
-  ) => (
-    <DayScreen
-      date={dayDate}
-      selectedDate={dayValue}
-      data={dayData}
-      categories={categories}
-      settings={appSettings}
-      onMoveDate={setSelectedDate}
-      onPick={() => { setPickerTab("foods"); setRoute("picker"); }}
-      onTemplates={() => { setPickerTab("templates"); setRoute("picker"); }}
-      onCopy={async () => {
-        const count = await copyPreviousDay(dayDate, appSettings.copyConsumedState === "preserve");
-        setToast({ message:count ? `Copied ${count} foods` : "No previous day to copy" });
-      }}
-      onEdit={(entry) => {
-        setEditingFood(undefined);
-        setEditingEntry(entry);
-        setRoute(entry.recipe ? "recipeEntry" : "entryForm");
-      }}
-      onToast={setToast}
-    />
-  );
+  const openPicker = (tab: PickerTab) => { setPickerTab(tab); setRoute("picker"); };
+  const copyDay = async (dayDate: ISODate) => {
+    const count = await copyPreviousDay(dayDate, appSettings.copyConsumedState === "preserve");
+    setToast({ message:count ? `Copied ${count} foods` : "No previous day to copy" });
+  };
+  const editDayEntry = (entry: DayFoodEntry) => {
+    setEditingFood(undefined);
+    setEditingEntry(entry);
+    setRoute(entry.recipe ? "recipeEntry" : "entryForm");
+  };
+  const dayPanels = [
+    { dayDate: previousDate, dayValue: subDays(selectedDate, 1), active:false },
+    { dayDate: date, dayValue:selectedDate, active:true },
+    { dayDate: nextDate, dayValue: addDays(selectedDate, 1), active:false },
+  ];
   if (dbError)
     return (
       <main className="fatal">
@@ -433,15 +469,20 @@ export default function App() {
         <div className="tracking-layer" aria-hidden={route!=="day"||undefined} ref={element=>{if(element)element.inert=route!=="day"}}>
           <div className="day-carousel">
             <div ref={dayTrackRef} className="day-carousel-track">
-              <div className="day-carousel-panel" aria-hidden="true" ref={element=>{if(element)element.inert=true}}>
-                {renderDay(previousDate, subDays(selectedDate, 1), previousData)}
-              </div>
-              <div className="day-carousel-panel">
-                {renderDay(date, selectedDate, data)}
-              </div>
-              <div className="day-carousel-panel" aria-hidden="true" ref={element=>{if(element)element.inert=true}}>
-                {renderDay(nextDate, addDays(selectedDate, 1), nextData)}
-              </div>
+              {dayPanels.map(panel => (
+                <DayCarouselPanel
+                  key={panel.dayDate}
+                  {...panel}
+                  categories={categories}
+                  settings={appSettings}
+                  onMoveDate={setSelectedDate}
+                  onPick={() => openPicker("foods")}
+                  onTemplates={() => openPicker("templates")}
+                  onCopy={copyDay}
+                  onEdit={editDayEntry}
+                  onToast={setToast}
+                />
+              ))}
             </div>
           </div>
         </div>
@@ -504,6 +545,7 @@ export default function App() {
       {route === "foodForm" && (
         <FoodForm
           food={editingFood}
+          date={date}
           categories={categories}
           onClose={() => setRoute("picker")}
           onSaved={() => setRoute("picker")}
@@ -626,6 +668,7 @@ function DayScreen({
   date,
   selectedDate,
   data,
+  active = true,
   categories,
   settings,
   onMoveDate,
@@ -638,6 +681,7 @@ function DayScreen({
   date: ISODate;
   selectedDate: Date;
   data: ReturnType<typeof useDay>;
+  active?: boolean;
   categories: FoodCategory[];
   settings: AppSettings;
   onMoveDate: (d: Date) => void;
@@ -652,7 +696,7 @@ function DayScreen({
   const [templateName, setTemplateName] = useState("");
   const [nameConflict, setNameConflict] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(()=>new Set());
-  useEffect(() => setSelectedIds(new Set()), [date]);
+  useEffect(() => { if(!active)setSelectedIds(new Set()); }, [active,date]);
   const sensors = useSensors(
     useSensor(TouchSensor, {
       activationConstraint: { distance: 4 },
@@ -842,7 +886,7 @@ function DayScreen({
           </SortableContext>
         </DndContext>
       )}
-      {editing && (
+      {editing && createPortal(
         <div className="edit-toolbar" role="toolbar" aria-label={`Edit ${selectedIds.size} selected ${selectedIds.size===1?"entry":"entries"}`}>
           <button onClick={() => setSelectedIds(new Set())}>
             <Check />
@@ -871,7 +915,8 @@ function DayScreen({
             <Trash2 />
             <span>Delete{selectedIds.size>1?` ${selectedIds.size}`:""}</span>
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
       {convertOpen && (
         <div className="dialog-backdrop" role="presentation">
@@ -1172,10 +1217,15 @@ function FoodPicker({
             matchesFoodSearch(`${f.name} ${f.brand ?? ""} ${f.notes ?? ""} ${categories.find((c) => c.id === f.categoryId)?.name ?? ""}`,query),
         )
         .sort(
-          (a, b) =>
-            (b.lastLoggedAt ?? "").localeCompare(a.lastLoggedAt ?? "") ||
-            b.logCount - a.logCount ||
-            a.name.localeCompare(b.name),
+          (a, b) => {
+            if(query.trim()){
+              const secondaryA=`${a.brand??""} ${a.notes??""} ${categories.find(category=>category.id===a.categoryId)?.name??""}`;
+              const secondaryB=`${b.brand??""} ${b.notes??""} ${categories.find(category=>category.id===b.categoryId)?.name??""}`;
+              const relevance=foodSearchScore(b.name,query,secondaryB)-foodSearchScore(a.name,query,secondaryA);
+              if(relevance)return relevance;
+            }
+            return (b.lastLoggedAt ?? "").localeCompare(a.lastLoggedAt ?? "") || b.logCount - a.logCount || a.name.localeCompare(b.name);
+          },
         ),
     [foods, catalogFoods, category, query, categories],
   );
@@ -2031,12 +2081,14 @@ function SortableTemplateItem({
 }
 function FoodForm({
   food,
+  date,
   categories,
   onClose,
   onSaved,
   onDeleted,
 }: {
   food?: Food;
+  date: ISODate;
   categories: FoodCategory[];
   onClose: () => void;
   onSaved: () => void;
@@ -2118,6 +2170,7 @@ function FoodForm({
         updatedAt: now,
       };
       await db.foods.put(next);
+      if(food&&!officialCopy)await refreshFoodEntriesForDay(date,next);
       onSaved();
     } catch (ex) {
       setError(ex instanceof Error ? ex.message : "Could not save food");

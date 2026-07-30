@@ -5,7 +5,7 @@ import { openFoodFactsProductToDraft, parseNutritionLabelText, reviewedFood, typ
 import { db } from "./data/db";
 import { EnergyText } from "./energyDisplay";
 import { EnergyInput } from "./energyInput";
-import { searchRestaurantFoods } from "./domain/restaurantFoods";
+import { restaurantFoods,restaurantNames,searchRestaurantFoods } from "./domain/restaurantFoods";
 
 type Mode = "home" | "barcode" | "branded" | "restaurant" | "label" | "review";
 const blank = (): FoodDraft => ({ name: "", categoryId: "other", calculationMode: "per100", baseQuantity: 100, baseUnit: "g", calories: 0, protein: 0, carbohydrates: 0, fat: 0 });
@@ -77,12 +77,11 @@ function BrandedSearch({ onReview }: { onReview: (draft: FoodDraft) => void }) {
 
 function RestaurantSearch({ onReview }: { onReview: (draft: FoodDraft) => void }) {
   const [query, setQuery] = useState("");
-  const results = useMemo(() => searchRestaurantFoods(query), [query]);
+  const [restaurant,setRestaurant]=useState<string>();
+  const results = useMemo(() => restaurant?searchRestaurantFoods(query,restaurant):[], [query,restaurant]);
   return <section className="restaurant-import">
     <p className="restaurant-note"><Store/><span><strong>Local Australian catalogue</strong><small>Works offline. Menu recipes and portions can change, so review before saving.</small></span></p>
-    <label className="restaurant-search"><Search/><span className="sr-only">Search restaurants and menu items</span><input type="search" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Restaurant or menu item"/></label>
-    <div className="restaurant-results">{results.map(item=><button key={`${item.restaurant}-${item.name}`} onClick={()=>{const {restaurant:_,servingGrams:__,...draft}=item;onReview(draft)}}><span><strong>{item.name}</strong><small>{item.restaurant}{item.servingGrams?` · ${item.servingGrams} g serve`:" · per serve"}</small></span><b><EnergyText calories={item.calories}/><small>P {item.protein} · C {item.carbohydrates} · F {item.fat}</small></b></button>)}</div>
-    {!results.length&&<p className="restaurant-empty">No matching restaurant food yet. You can still create it manually.</p>}
+    {!restaurant?<><h2 className="restaurant-prompt">Choose a restaurant</h2><div className="restaurant-picker">{restaurantNames.map(name=><button key={name} onClick={()=>{setRestaurant(name);setQuery("")}}><Store/><span><strong>{name}</strong><small>{restaurantFoods.filter(food=>food.restaurant===name).length} menu items</small></span></button>)}</div></>:<><button className="restaurant-change" onClick={()=>{setRestaurant(undefined);setQuery("")}}><ChevronLeft/>All restaurants <b>{restaurant}</b></button><label className="restaurant-search"><Search/><span className="sr-only">Search {restaurant} menu</span><input type="search" value={query} onChange={event=>setQuery(event.target.value)} placeholder={`Search ${restaurant} menu`}/></label><div className="restaurant-results">{results.map(item=><button key={`${item.restaurant}-${item.name}`} onClick={()=>{const {restaurant:_,servingGrams:__,...draft}=item;onReview(draft)}}><span><strong>{item.name}</strong><small>{item.restaurant}{item.servingGrams?` · ${item.servingGrams} g serve`:" · per serve"}</small></span><b><EnergyText calories={item.calories}/><small>P {item.protein} · C {item.carbohydrates} · F {item.fat}</small></b></button>)}</div>{!results.length&&<p className="restaurant-empty">No matching menu item in the offline catalogue. Import its label or create it manually.</p>}</>}
   </section>;
 }
 

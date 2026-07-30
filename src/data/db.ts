@@ -334,6 +334,18 @@ export async function replaceFoodEntry(
   });
 }
 
+export async function refreshFoodEntriesForDay(date:ISODate,food:Food):Promise<number>{
+  return db.transaction("rw",db.days,db.entries,async()=>{
+    const day=await db.days.where("date").equals(date).first();
+    if(!day)return 0;
+    const entries=(await db.entries.where("dayId").equals(day.id).toArray()).filter(entry=>!entry.recipe&&entry.snapshot.foodId===food.id);
+    if(!entries.length)return 0;
+    const now=new Date().toISOString();
+    await db.entries.bulkPut(entries.map(entry=>({...entry,snapshot:createSnapshot(food,entry.snapshot.quantity),updatedAt:now})));
+    return entries.length;
+  });
+}
+
 export async function addRecipeToDay(
   date: ISODate,
   recipe: Recipe,

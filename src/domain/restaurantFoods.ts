@@ -31,6 +31,9 @@ const oporto = (name: string, grams: number | undefined, calories: number, prote
   source: oportoSource,
 });
 
+const nandosSource={kind:"restaurant" as const,provider:"Nando's Australia nutritional information",datasetVersion:"Checked July 2026",importedAt:"2026-07-30T00:00:00.000Z",sourceUrl:"https://www.nandos.com.au/menu-item"};
+const nandos=(name:string,grams:number,calories:number,protein:number,carbohydrates:number,fat:number):RestaurantFood=>({restaurant:"Nando's",name,brand:"Nando's",categoryId:"other",calculationMode:"perServing",baseQuantity:1,baseUnit:"serving",servingDescription:`1 serve (${grams} g)`,servingGrams:grams,calories,protein,carbohydrates,fat,notes:"Bundled from Nando's Australia published nutrition information. Menu recipes and portions can change; verify against the current restaurant listing.",source:nandosSource});
+
 // Curated starter catalogue from published Australian restaurant nutrition data.
 // It is intentionally small, source-labelled and editable rather than presented as universal nutritional advice.
 export const restaurantFoods: RestaurantFood[] = [
@@ -42,7 +45,11 @@ export const restaurantFoods: RestaurantFood[] = [
   oporto("Crispy Chicken Strips (3 Pieces)", 155, 380, 31, 15, 22),
   oporto("Spicy Rice (Single)", 170, 230, 4, 41, 5),
   oporto("Portuguese Salad (Single)", 160, 30, 2, 4, 0),
+  nandos("Half PERi-PERi Chicken",460,715,108,1.1,30.8),
+  nandos("Supremo Chicken Wrap",332,648,41.9,52.5,28.9),
 ];
+
+export const restaurantNames=[...new Set(restaurantFoods.map(food=>food.restaurant))].sort((a,b)=>a.localeCompare(b));
 
 export function searchRestaurantFoods(query: string, restaurant = "all"): RestaurantFood[] {
   const needle = query.trim().toLocaleLowerCase();

@@ -63,6 +63,7 @@ test("horizontal swipes change days and secondary screens minimise to the tracke
   await session.send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});
   await session.detach();
   await expect(page.getByText("28 July 2026",{exact:true})).toBeVisible();
+  await expect(page.locator(".day-carousel-panel:not([aria-hidden]) .loading")).toHaveCount(0);
   await swipeScreen(page,{x:20,y:430},{x:300,y:430});
   await expect(page.getByText("27 July 2026",{exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Body",exact:true}).click();
@@ -144,6 +145,8 @@ test("Australian generic search understands common food names and aliases", asyn
   await search.fill("quick oats");
   await expect(page.getByText("Quick oats", { exact: true })).toBeVisible();
   await expect(page.getByText("Oats, rolled, uncooked", { exact: true })).toBeVisible();
+  await search.fill("milk");
+  await expect(page.locator(".food-list .food-select strong").first()).toContainText(/^Milk/i);
 });
 
 test("renaming a recipe updates its existing day card", async ({ page }) => {
@@ -179,6 +182,8 @@ test("long-press edit mode supports selecting and deleting multiple entries",asy
   await expect(page.getByRole("toolbar",{name:"Edit 1 selected entry"})).toBeVisible();
   await tapTouch(page,page.getByRole("button",{name:"Select Beef Rice Bowl",exact:true}));
   await expect(page.getByRole("toolbar",{name:"Edit 2 selected entries"})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Done"})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Delete 2"})).toBeVisible();
   await page.getByRole("button",{name:"Delete 2"}).click();
   await expect(currentPanel.locator(".food-card")).toHaveCount(0);
   await expect(page.getByText("2 entries deleted")).toBeVisible();
@@ -206,7 +211,8 @@ test("Australian fast food catalogue finds Chicken Rappa offline and requires re
   await page.getByRole("button", { name: /Import label/i }).click();
   await page.getByRole("button", { name: /Australian fast food/i }).click();
   await expect(page.getByRole("heading", { name: "Australian Fast Food" })).toBeVisible();
-  await page.getByPlaceholder("Restaurant or menu item").fill("Chicken Rappa");
+  await page.getByRole("button",{name:/Oporto.*8 menu items/i}).click();
+  await page.getByPlaceholder("Search Oporto menu").fill("Chicken Rappa");
   const result = page.getByRole("button", { name: /Chicken Rappa.*Oporto.*420 kcal/i }).first();
   await expect(result).toBeVisible();
   await result.click();
@@ -296,4 +302,25 @@ test("per-serving custom food logs and displays as serves", async ({ page }) => 
   await expect(page.getByRole("button", { name: "Edit Serving unit test" })).toHaveCount(0);
   await page.getByRole("button", { name: "Close" }).click();
   await expect(page.getByRole("button", { name: "Edit Serving unit test" }).getByText("2 serves")).toBeVisible();
+});
+
+test("editing a saved food refreshes matching entries on the selected day",async({page})=>{
+  await page.goto("/#screen=day&date=2026-07-27");
+  await page.getByRole("button",{name:"Food",exact:true}).click();
+  await page.getByRole("button",{name:"Add custom food"}).click();
+  await page.getByLabel("Food name").fill("Refresh Test Food");
+  await page.getByRole("spinbutton",{name:"Energy in kilocalories"}).fill("100");
+  await page.getByRole("button",{name:"Save food"}).click();
+  const search=page.getByPlaceholder("Food name, brand or category");
+  await search.fill("Refresh Test Food");
+  await page.locator(".food-select").filter({hasText:"Refresh Test Food"}).click();
+  await page.getByRole("button",{name:"Add food"}).click();
+  await expect(page.getByRole("button",{name:"Edit Refresh Test Food"})).toContainText("100 kcal");
+  await page.getByRole("button",{name:"Food",exact:true}).click();
+  await page.getByPlaceholder("Food name, brand or category").fill("Refresh Test Food");
+  await page.getByRole("button",{name:"Edit Refresh Test Food"}).click();
+  await page.getByRole("spinbutton",{name:"Energy in kilocalories"}).fill("250");
+  await page.getByRole("button",{name:"Save food"}).click();
+  await page.getByRole("button",{name:"Close"}).click();
+  await expect(page.getByRole("button",{name:"Edit Refresh Test Food"})).toContainText("250 kcal");
 });
