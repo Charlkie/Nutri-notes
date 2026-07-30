@@ -147,6 +147,8 @@ test("Australian generic search understands common food names and aliases", asyn
   await expect(page.getByText("Oats, rolled, uncooked", { exact: true })).toBeVisible();
   await search.fill("milk");
   await expect(page.locator(".food-list .food-select strong").first()).toContainText(/^Milk/i);
+  await search.fill("full cream milk");
+  await expect(page.locator(".food-list .food-select strong").first()).toContainText(/Milk.*regular fat/i);
 });
 
 test("renaming a recipe updates its existing day card", async ({ page }) => {

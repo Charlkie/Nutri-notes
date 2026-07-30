@@ -11,4 +11,10 @@ describe("generic food search",()=>{
     expect(foodSearchScore("Milk, cow, fluid, regular fat","milk")).toBeGreaterThan(foodSearchScore("Coffee beverage, prepared with milk","milk"));
     expect(foodSearchScore("Milk","milk")).toBeGreaterThan(foodSearchScore("Milk, cow, fluid, regular fat","milk"));
   });
+  it("understands everyday Australian milk descriptions",()=>{
+    const regular="Milk, cow, fluid, regular fat (3.5%), unfortified";
+    expect(matchesFoodSearch(regular,"full cream milk")).toBe(true);
+    expect(foodSearchScore(regular,"full cream milk")).toBeGreaterThan(6_000);
+    expect(matchesFoodSearch("Milk, cow, fluid, skim, unfortified","skimmed milk")).toBe(true);
+  });
 });
