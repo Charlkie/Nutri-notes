@@ -73,9 +73,10 @@ The PWA never embeds FatSecret credentials. Follow [worker/README.md](worker/REA
 
 ### Refreshing bundled restaurant menus
 
-The Hungry Jack's, Subway and Guzman y Gomez importers require `curl` and Poppler's `pdftotext`. Each importer downloads the current official document and prints deterministic TypeScript data. To verify that checked-in data still matches its source:
+The McDonald's, Hungry Jack's, Subway and Guzman y Gomez importers require `curl` and Poppler's `pdftotext`. Each importer downloads the current official document and prints deterministic TypeScript data. To verify that checked-in data still matches its source:
 
 ```bash
+diff -u src/domain/mcdonaldsMenu.generated.ts <(node scripts/import-mcdonalds.mjs)
 diff -u src/domain/hungryJacksMenu.generated.ts <(node scripts/import-hungry-jacks.mjs)
 diff -u src/domain/subwayMenu.generated.ts <(node scripts/import-subway.mjs)
 diff -u src/domain/gygMenu.generated.ts <(node scripts/import-gyg.mjs)
@@ -90,8 +91,8 @@ diff -u src/domain/gygMenu.generated.ts <(node scripts/import-gyg.mjs)
 - Local food search, category filters, usage metadata, custom food creation and saved-food editing
 - Offline FSANZ AUSNUT 2023 catalogue search with 3,741 Australian foods, source/derivation metadata and useful source-derived household measures
 - Optional Open Food Facts branded search and barcode lookup with community-source labelling
-- Restaurant-first Australian fast-food flow across 50 major chains, including verified kJ-only entry without fabricated macros and source-labelled offline catalogues: 179 Hungry Jack's items, 179 Subway items, 287 Guzman y Gomez items, plus initial McDonald's, Oporto and Nando's imports
-- Reproducible official-document importers for Hungry Jack's, Subway Australia and Guzman y Gomez; generated menu data keeps the source document and revision attached to saved foods
+- Restaurant-first Australian fast-food flow across 50 major chains, including verified kJ-only entry without fabricated macros and source-labelled offline catalogues: 60 McDonald's core items, 118 KFC menu items, 179 Hungry Jack's items, 179 Subway items, 287 Guzman y Gomez items, plus smaller Oporto and Nando's imports
+- Reproducible official-document importers for McDonald's Australia, Hungry Jack's, Subway Australia and Guzman y Gomez; generated menu data keeps the source document and revision attached to saved foods
 - Camera barcode capture using native detection or the bundled open-source ZXing fallback, with manual barcode entry as a final fallback
 - Nutrition-label photo intake, on-device text detection where available, iPhone Live Text/manual fallback, and parsed Australian nutrition panels
 - Mandatory review confirmation before barcode, branded, or label-derived nutrition is saved

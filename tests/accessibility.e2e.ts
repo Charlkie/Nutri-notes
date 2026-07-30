@@ -254,10 +254,25 @@ test("Australian fast food catalogue finds Chicken Rappa offline and requires re
   await expectNoSeriousViolations(page);
 });
 
-test("large official Hungry Jack's and Subway menus are searchable offline",async({page})=>{
+test("large official Australian restaurant menus are searchable offline",async({page})=>{
   await page.goto("/#screen=day&date=2026-07-27");
   await page.getByRole("button",{name:"Food",exact:true}).click();
   await page.getByRole("button",{name:/Import label/i}).click();
+  await page.getByRole("button",{name:/Australian fast food/i}).click();
+  await page.getByRole("button",{name:/McDonald's.*62 menu items.*offline/i}).click();
+  await page.getByRole("searchbox",{name:/Search McDonald's menu/i}).fill("big mac");
+  await page.getByRole("button",{name:/^Big Mac® McDonald's.*557 kcal/i}).click();
+  await expect(page.getByLabel("Food name")).toHaveValue("Big Mac®");
+  await expect(page.getByLabel("Protein (g)")).toHaveValue("24.6");
+  await page.getByRole("button",{name:"Back"}).click();
+  await page.getByRole("button",{name:/Australian fast food/i}).click();
+  await page.getByRole("button",{name:/KFC.*118 menu items.*offline/i}).click();
+  await page.getByRole("searchbox",{name:/Search KFC menu/i}).fill("zinger burger");
+  await page.getByRole("button",{name:/^Zinger® Burger KFC.*448 kcal.*P —.*C —.*F —/i}).click();
+  await expect(page.getByLabel("Food name")).toHaveValue("Zinger® Burger");
+  await expect(page.getByLabel("Protein (g)")).toHaveValue("");
+  await expect(page.getByLabel("Protein (g)")).toHaveAttribute("placeholder","Not published");
+  await page.getByRole("button",{name:"Back"}).click();
   await page.getByRole("button",{name:/Australian fast food/i}).click();
   await page.getByRole("button",{name:/Hungry Jack's.*179 menu items.*offline/i}).click();
   await page.getByRole("searchbox",{name:/Search Hungry Jack's menu/i}).fill("whopper");
@@ -285,7 +300,7 @@ test("official menu energy can be saved without inventing unpublished macros",as
   await page.getByRole("button",{name:"Food",exact:true}).click();
   await page.getByRole("button",{name:/Import label/i}).click();
   await page.getByRole("button",{name:/Australian fast food/i}).click();
-  await page.getByRole("button",{name:/McDonald's.*2 menu items.*offline/i}).click();
+  await page.getByRole("button",{name:/McDonald's.*62 menu items.*offline/i}).click();
   await page.getByRole("searchbox",{name:/Search McDonald's menu/i}).fill("Official energy test burger");
   await page.getByRole("button",{name:"Add from official menu kJ"}).click();
   await page.getByLabel("Food name").fill("Official energy test burger");

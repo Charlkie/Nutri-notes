@@ -1,6 +1,8 @@
 import type { FoodDraft } from "./foodImport";
 import { gygMenu } from "./gygMenu.generated";
 import { hungryJacksMenu } from "./hungryJacksMenu.generated";
+import { kfcMenu } from "./kfcMenu.generated";
+import { mcdonaldsMenu } from "./mcdonaldsMenu.generated";
 import { subwayMenu } from "./subwayMenu.generated";
 
 export interface RestaurantFood extends FoodDraft {
@@ -62,6 +64,56 @@ const mcdonaldsDessert = (name: string, servingDescription: string, servingGrams
   notes: "Imported from McDonald's Australia published nutrition information. Standard formulations and portions can change; verify against the current official document.",
   source: mcdonaldsDessertsSource,
 });
+
+const mcdonaldsCoreSourceUrl = "https://www.mcdonalds.com/content/dam/sites/au/nfl/nutrition/PDFs/Aus%20Core%20Food%20Menu_January%202026.pdf";
+const mcdonaldsCoreFoods: RestaurantFood[] = mcdonaldsMenu.map(([name, servingGrams, calories, protein, carbohydrates, fat]) => ({
+  restaurant: "McDonald's",
+  name,
+  brand: "McDonald's",
+  categoryId: "other",
+  calculationMode: "perServing",
+  baseQuantity: 1,
+  baseUnit: "serving",
+  servingDescription: servingGrams ? `1 serve (${servingGrams} g)` : "1 serve",
+  servingGrams,
+  calories,
+  protein,
+  carbohydrates,
+  fat,
+  notes: "Imported from McDonald's Australia's January 2026 core-food nutrition guide. Serving weights are inferred from published per-serve and per-100-g energy where internally consistent; formulations and portions can change.",
+  source: {
+    kind: "restaurant",
+    provider: "McDonald's Australia Quality Assurance",
+    datasetVersion: "Core Food Menu · January 2026 · revision 113",
+    importedAt: "2026-07-30T00:00:00.000Z",
+    sourceUrl: mcdonaldsCoreSourceUrl,
+  },
+}));
+
+const kfcSourceUrl = "https://www.kfc.com.au/nutrition-allergen";
+const kfcFoods: RestaurantFood[] = kfcMenu.map(([name, kilojoules]) => ({
+  restaurant: "KFC",
+  name,
+  brand: "KFC",
+  categoryId: "other",
+  calculationMode: "perServing",
+  baseQuantity: 1,
+  baseUnit: "serving",
+  servingDescription: "1 menu item",
+  calories: kilojoules / 4.184,
+  protein: 0,
+  carbohydrates: 0,
+  fat: 0,
+  unavailableNutrients: ["protein", "carbohydrates", "fat", "fibre"],
+  notes: `KFC Australia publishes ${kilojoules} kJ for this menu item. Catalogue-level macros were not published and are intentionally unavailable rather than recorded as zero. Products, portions and promotions can change.`,
+  source: {
+    kind: "restaurant",
+    provider: "KFC Australia Nutrition & Allergen menu",
+    datasetVersion: "Official online menu captured 30 July 2026; page nutrition notice dated September 2023",
+    importedAt: "2026-07-30T00:00:00.000Z",
+    sourceUrl: kfcSourceUrl,
+  },
+}));
 
 const hungryJacksFoods: RestaurantFood[] = hungryJacksMenu.map(([name, servingGrams, calories, protein, carbohydrates, fat, sourcePath, sourceVersion]) => ({
   restaurant: "Hungry Jack's",
@@ -137,11 +189,13 @@ const gygFoods: RestaurantFood[] = gygMenu.map(([name, servingGrams, calories, p
   },
 }));
 
-// Curated starter catalogue from published Australian restaurant nutrition data.
-// It is intentionally small, source-labelled and editable rather than presented as universal nutritional advice.
+// Source-labelled catalogue from published Australian restaurant nutrition data.
+// Every imported item remains editable and is not presented as universal nutritional advice.
 export const restaurantFoods: RestaurantFood[] = [
+  ...mcdonaldsCoreFoods,
   mcdonaldsDessert("Birthday Cake – Ice Cream Cake", "1 slice (44 g)", 44, 81, 0.8, 12.5, 2.9),
   mcdonaldsDessert("Honey", "1 packet (13 g)", 13, 44, 0, 10.8, 0),
+  ...kfcFoods,
   ...hungryJacksFoods,
   ...subwayFoods,
   ...gygFoods,
