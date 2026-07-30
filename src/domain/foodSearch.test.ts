@@ -17,4 +17,13 @@ describe("generic food search",()=>{
     expect(foodSearchScore(regular,"full cream milk")).toBeGreaterThan(6_000);
     expect(matchesFoodSearch("Milk, cow, fluid, skim, unfortified","skimmed milk")).toBe(true);
   });
+  it("tolerates ordinary typos without matching unrelated foods",()=>{
+    expect(matchesFoodSearch("Barramundi, raw","baramundi")).toBe(true);
+    expect(matchesFoodSearch("Chicken breast, grilled","chiken brest")).toBe(true);
+    expect(matchesFoodSearch("Chocolate cake","chiken brest")).toBe(false);
+  });
+  it("allows useful partial multi-word queries",()=>{
+    expect(matchesFoodSearch("Chicken breast, grilled, skinless","grill chicken breast")).toBe(true);
+    expect(matchesFoodSearch("Milk, cow, fluid, regular fat","regular cow milk")).toBe(true);
+  });
 });

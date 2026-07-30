@@ -7,7 +7,7 @@ import { ArrowDown, ArrowUp, Check, Copy, GripVertical, Pencil, Plus, Search, Tr
 import { addRecipeToDay, db, id, saveRecipe, updateLoggedRecipeEntry } from "./data/db";
 import { recipeIngredientsFromLogged, recipeSnapshot, scaleLoggedRecipe } from "./domain/recipes";
 import { createSnapshot, roundMacro } from "./domain/nutrition";
-import { matchesFoodSearch } from "./domain/foodSearch";
+import { foodSearchScore,matchesFoodSearch } from "./domain/foodSearch";
 import { EnergyText } from "./energyDisplay";
 import { NumericInput } from "./NumericInput";
 import type { DayFoodEntry, Food, FoodCategory, FoodUnit, ISODate, LoggedRecipe, LoggedRecipeIngredient, Recipe, RecipeIngredient } from "./domain/types";
@@ -54,7 +54,7 @@ function RecipeIngredientPicker({categories,excludedIds,onClose,onSelected,onCus
   const [category,setCategory]=useState<string>();
   const excluded=new Set(excludedIds);
   const savedIds=new Set(foods.map(food=>food.id));
-  const visible=useMemo(()=>[...foods,...(query.trim().length>=2?catalogFoods.filter(food=>!savedIds.has(food.id)):[])].filter(food=>!excluded.has(food.id)&&(!category||food.categoryId===category)&&matchesFoodSearch(`${food.name} ${food.brand??""} ${food.notes??""} ${categories.find(item=>item.id===food.categoryId)?.name??""}`,query)).sort((a,b)=>(b.lastLoggedAt??"").localeCompare(a.lastLoggedAt??"")||b.logCount-a.logCount||a.name.localeCompare(b.name)),[foods,catalogFoods,query,category,categories,excludedIds.join("|")]);
+  const visible=useMemo(()=>[...foods,...(query.trim().length>=2?catalogFoods.filter(food=>!savedIds.has(food.id)):[])].filter(food=>!excluded.has(food.id)&&(!category||food.categoryId===category)&&matchesFoodSearch(`${food.name} ${food.brand??""} ${food.notes??""} ${categories.find(item=>item.id===food.categoryId)?.name??""}`,query)).sort((a,b)=>{if(query.trim()){const relevance=foodSearchScore(b.name,query,`${b.brand??""} ${b.notes??""}`)-foodSearchScore(a.name,query,`${a.brand??""} ${a.notes??""}`);if(relevance)return relevance}return(b.lastLoggedAt??"").localeCompare(a.lastLoggedAt??"")||b.logCount-a.logCount||a.name.localeCompare(b.name)}),[foods,catalogFoods,query,category,categories,excludedIds.join("|")]);
   const choose=async(food:Food)=>{if(!savedIds.has(food.id))await db.foods.put(food);onSelected(food)};
   return <main className="screen picker-screen recipe-ingredient-picker">
     <header className="modal-header"><button className="icon-button close" onClick={onClose} aria-label="Close ingredient picker"><X/></button><h1>Choose Ingredient</h1><button className="icon-button add" onClick={onCustom} aria-label="Add custom ingredient food"><Plus/></button></header>

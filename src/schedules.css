@@ -33,6 +33,8 @@
   justify-content: stretch;
 }
 
+.schedule-dialog .schedule-fields label{min-width:0;display:block}.schedule-dialog .schedule-fields input{display:block;box-sizing:border-box;width:100%;min-width:0;height:48px;margin:7px 0 12px;padding:0 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--text);font-size:16px;line-height:48px}.schedule-dialog .schedule-fields input[type="date"]{-webkit-appearance:none;appearance:none;text-align:center}
+
 .schedule-dialog .schedule-fields input {
   margin-bottom: 12px;
 }
