@@ -55,6 +55,7 @@ plan in use.
 ## Architecture
 
 - `src/domain/` contains framework-independent types, nutrition calculations, immutable snapshot creation, totals, and day-copy logic.
+- `scripts/import-*.mjs` regenerate bundled Australian restaurant catalogues from the chains' official published nutrition PDFs; generated files retain source/version metadata.
 - `src/data/` contains the versioned Dexie schema, transactions, persistence services, categories, and editable seed foods.
 - `src/App.tsx` contains the current mobile screen flows and accessible interaction controls.
 - `src/styles.css` defines the safe-area-aware, token-driven, iPhone-first visual system.
@@ -70,6 +71,16 @@ Recipes use the same boundary. Saved recipes reference current foods and define 
 
 The PWA never embeds FatSecret credentials. Follow [worker/README.md](worker/README.md) to deploy the Worker, then create the GitHub Actions repository variable `VITE_RESTAURANT_API_URL` containing its HTTPS URL. The Pages workflow injects only that public Worker URL into the production bundle. Search responses are not cached; a reviewed selection becomes an ordinary independent local food snapshot.
 
+### Refreshing bundled restaurant menus
+
+The Hungry Jack's, Subway and Guzman y Gomez importers require `curl` and Poppler's `pdftotext`. Each importer downloads the current official document and prints deterministic TypeScript data. To verify that checked-in data still matches its source:
+
+```bash
+diff -u src/domain/hungryJacksMenu.generated.ts <(node scripts/import-hungry-jacks.mjs)
+diff -u src/domain/subwayMenu.generated.ts <(node scripts/import-subway.mjs)
+diff -u src/domain/gygMenu.generated.ts <(node scripts/import-gyg.mjs)
+```
+
 ## Implemented
 
 - Five-item app shell with Body, Calendar, Food, Charts, and Settings navigation
@@ -79,7 +90,8 @@ The PWA never embeds FatSecret credentials. Follow [worker/README.md](worker/REA
 - Local food search, category filters, usage metadata, custom food creation and saved-food editing
 - Offline FSANZ AUSNUT 2023 catalogue search with 3,741 Australian foods, source/derivation metadata and useful source-derived household measures
 - Optional Open Food Facts branded search and barcode lookup with community-source labelling
-- Restaurant-first Australian fast-food flow across 50 major chains, including verified kJ-only entry without fabricated macros, source-labelled offline catalogues (including an initial McDonald's Australia official-document import), and an optional paid FatSecret-backed Worker
+- Restaurant-first Australian fast-food flow across 50 major chains, including verified kJ-only entry without fabricated macros and source-labelled offline catalogues: 179 Hungry Jack's items, 179 Subway items, 287 Guzman y Gomez items, plus initial McDonald's, Oporto and Nando's imports
+- Reproducible official-document importers for Hungry Jack's, Subway Australia and Guzman y Gomez; generated menu data keeps the source document and revision attached to saved foods
 - Camera barcode capture using native detection or the bundled open-source ZXing fallback, with manual barcode entry as a final fallback
 - Nutrition-label photo intake, on-device text detection where available, iPhone Live Text/manual fallback, and parsed Australian nutrition panels
 - Mandatory review confirmation before barcode, branded, or label-derived nutrition is saved

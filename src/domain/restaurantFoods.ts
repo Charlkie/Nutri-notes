@@ -1,4 +1,7 @@
 import type { FoodDraft } from "./foodImport";
+import { gygMenu } from "./gygMenu.generated";
+import { hungryJacksMenu } from "./hungryJacksMenu.generated";
+import { subwayMenu } from "./subwayMenu.generated";
 
 export interface RestaurantFood extends FoodDraft {
   restaurant: string;
@@ -60,11 +63,88 @@ const mcdonaldsDessert = (name: string, servingDescription: string, servingGrams
   source: mcdonaldsDessertsSource,
 });
 
+const hungryJacksFoods: RestaurantFood[] = hungryJacksMenu.map(([name, servingGrams, calories, protein, carbohydrates, fat, sourcePath, sourceVersion]) => ({
+  restaurant: "Hungry Jack's",
+  name,
+  brand: "Hungry Jack's",
+  categoryId: "other",
+  calculationMode: "perServing",
+  baseQuantity: 1,
+  baseUnit: "serving",
+  servingDescription: `1 serve (${servingGrams} g)`,
+  servingGrams,
+  calories,
+  protein,
+  carbohydrates,
+  fat,
+  notes: "Imported from Hungry Jack's Australia published nutrition information. Standard formulations, availability and portions can change; verify against the current official document.",
+  source: {
+    kind: "restaurant",
+    provider: "Hungry Jack's Australia nutritional information",
+    datasetVersion: sourceVersion,
+    importedAt: "2026-07-30T00:00:00.000Z",
+    sourceUrl: `https://www.hungryjacks.com.au${sourcePath}`,
+  },
+}));
+
+const subwaySourceUrl = "https://media.subway.com/dam/urn:aaid:aem:9e27a496-e421-4bf1-b6d6-afa95d70746d/original/as/AUS_Nutritional_Web_Guide_May_2026.pdf";
+const subwayFoods: RestaurantFood[] = subwayMenu.map(([name, servingGrams, calories, protein, carbohydrates, fat]) => ({
+  restaurant: "Subway",
+  name,
+  brand: "Subway",
+  categoryId: "other",
+  calculationMode: "perServing",
+  baseQuantity: 1,
+  baseUnit: "serving",
+  servingDescription: `1 serve (${servingGrams} g)`,
+  servingGrams,
+  calories,
+  protein,
+  carbohydrates,
+  fat,
+  notes: "Imported from Subway Australia's published May 2026 nutrition guide. Made-to-order portions and formulations can change; verify against the current official document.",
+  source: {
+    kind: "restaurant",
+    provider: "Subway Australia nutrition information",
+    datasetVersion: "Australian nutritional web guide · May 2026",
+    importedAt: "2026-07-30T00:00:00.000Z",
+    sourceUrl: subwaySourceUrl,
+  },
+}));
+
+const gygSourceUrl = "https://www.guzmanygomez.com.au/wp-content/uploads/2026/07/260617_NUTRITION_ALLERGEN_GUIDE_420X297MM.pdf";
+const gygFoods: RestaurantFood[] = gygMenu.map(([name, servingGrams, calories, protein, carbohydrates, fat]) => ({
+  restaurant: "Guzman y Gomez",
+  name,
+  brand: "Guzman y Gomez",
+  categoryId: "other",
+  calculationMode: "perServing",
+  baseQuantity: 1,
+  baseUnit: "serving",
+  servingDescription: `1 serve (${servingGrams} g)`,
+  servingGrams,
+  calories,
+  protein,
+  carbohydrates,
+  fat,
+  notes: "Imported from Guzman y Gomez Australia's published July 2026 nutrition guide. Published '<0.1 g' values use 0.05 g for calculations. Formulations and portions can change; verify against the current official document.",
+  source: {
+    kind: "restaurant",
+    provider: "Guzman y Gomez Australia nutritional information",
+    datasetVersion: "Nutrition, ingredient and allergen guide · current 2 July 2026",
+    importedAt: "2026-07-30T00:00:00.000Z",
+    sourceUrl: gygSourceUrl,
+  },
+}));
+
 // Curated starter catalogue from published Australian restaurant nutrition data.
 // It is intentionally small, source-labelled and editable rather than presented as universal nutritional advice.
 export const restaurantFoods: RestaurantFood[] = [
   mcdonaldsDessert("Birthday Cake – Ice Cream Cake", "1 slice (44 g)", 44, 81, 0.8, 12.5, 2.9),
   mcdonaldsDessert("Honey", "1 packet (13 g)", 13, 44, 0, 10.8, 0),
+  ...hungryJacksFoods,
+  ...subwayFoods,
+  ...gygFoods,
   oporto("Chicken Rappa", 276, 420, 27, 34, 19),
   oporto("Chicken Rappsnacker", 160, 340, 17, 44, 10),
   oporto("Quarter Chicken", 179, 300, 42, 3, 13),
@@ -80,10 +160,27 @@ export const restaurantFoods: RestaurantFood[] = [
 export const majorAustralianRestaurantNames=["McDonald's","KFC","Hungry Jack's","Subway","Domino's","Pizza Hut","Red Rooster","Oporto","Nando's","Guzman y Gomez","Grill'd","Zambrero","Mad Mex","Taco Bell","Carl's Jr.","Starbucks","Gloria Jean's","The Coffee Club","Boost Juice","Donut King","Krispy Kreme","Bakers Delight","Muffin Break","Sushi Hub","Roll'd","Schnitz","Betty's Burgers","Burger Urge","Lord of the Fries","Soul Origin","SumoSalad","Fishbowl","El Jannah","Ribs & Burgers","Crust Pizza","Pizza Capers","Gelatissimo","San Churro","Max Brenner","Chatime","Gong Cha","Sharetea","Oliver's Real Food","Jamaica Blue","Hudsons Coffee","Zarraffa's Coffee","Pie Face","Chicken Treat","Rashays","The Cheesecake Shop"];
 export const restaurantNames=[...new Set([...majorAustralianRestaurantNames,...restaurantFoods.map(food=>food.restaurant)])];
 
+const normalizeRestaurantSearch = (value: string) => value
+  .normalize("NFKD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .toLocaleLowerCase()
+  .replace(/[^a-z0-9]+/g, " ")
+  .trim()
+  .replace(/\s+/g, " ");
+
 export function searchRestaurantFoods(query: string, restaurant = "all"): RestaurantFood[] {
-  const needle = query.trim().toLocaleLowerCase();
-  return restaurantFoods.filter((food) =>
-    (restaurant === "all" || food.restaurant === restaurant) &&
-    (!needle || `${food.restaurant} ${food.name}`.toLocaleLowerCase().includes(needle)),
-  );
+  const needle = normalizeRestaurantSearch(query);
+  const tokens = needle.split(" ").filter(Boolean);
+  const candidates = restaurantFoods.filter((food) => {
+    if (restaurant !== "all" && food.restaurant !== restaurant) return false;
+    const searchable = normalizeRestaurantSearch(`${food.restaurant} ${food.name}`);
+    return tokens.every((token) => searchable.includes(token));
+  });
+  if (!needle) return candidates;
+  return candidates.sort((left, right) => {
+    const leftName = normalizeRestaurantSearch(left.name);
+    const rightName = normalizeRestaurantSearch(right.name);
+    const score = (name: string) => name === needle ? 4 : name.startsWith(`${needle} `) ? 3 : name.includes(needle) ? 2 : 1;
+    return score(rightName) - score(leftName) || left.name.localeCompare(right.name);
+  });
 }

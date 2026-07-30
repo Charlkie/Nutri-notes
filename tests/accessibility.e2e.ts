@@ -254,6 +254,32 @@ test("Australian fast food catalogue finds Chicken Rappa offline and requires re
   await expectNoSeriousViolations(page);
 });
 
+test("large official Hungry Jack's and Subway menus are searchable offline",async({page})=>{
+  await page.goto("/#screen=day&date=2026-07-27");
+  await page.getByRole("button",{name:"Food",exact:true}).click();
+  await page.getByRole("button",{name:/Import label/i}).click();
+  await page.getByRole("button",{name:/Australian fast food/i}).click();
+  await page.getByRole("button",{name:/Hungry Jack's.*179 menu items.*offline/i}).click();
+  await page.getByRole("searchbox",{name:/Search Hungry Jack's menu/i}).fill("whopper");
+  await page.getByRole("button",{name:/^Whopper Hungry Jack's.*582 kcal/i}).click();
+  await expect(page.getByLabel("Food name")).toHaveValue("Whopper");
+  await expect(page.getByLabel("Protein (g)")).toHaveValue("28.1");
+  await page.getByRole("button",{name:"Back"}).click();
+  await page.getByRole("button",{name:/Australian fast food/i}).click();
+  await page.getByRole("button",{name:/Subway.*179 menu items.*offline/i}).click();
+  await page.getByRole("searchbox",{name:/Search Subway menu/i}).fill("chicken classic 6-inch");
+  await page.getByRole("button",{name:/Chicken Classic \(6-inch sub\).*492 kcal/i}).click();
+  await expect(page.getByLabel("Food name")).toHaveValue("Chicken Classic (6-inch sub)");
+  await expect(page.getByLabel("Carbs (g)")).toHaveValue("47.5");
+  await page.getByRole("button",{name:"Back"}).click();
+  await page.getByRole("button",{name:/Australian fast food/i}).click();
+  await page.getByRole("button",{name:/Guzman y Gomez.*287 menu items.*offline/i}).click();
+  await page.getByRole("searchbox",{name:/Search Guzman y Gomez menu/i}).fill("mild grilled chicken burrito");
+  await page.getByRole("button",{name:/Mild Grilled Chicken \(Burrito\).*773 kcal/i}).click();
+  await expect(page.getByLabel("Food name")).toHaveValue("Mild Grilled Chicken (Burrito)");
+  await expect(page.getByLabel("Protein (g)")).toHaveValue("48.3");
+});
+
 test("official menu energy can be saved without inventing unpublished macros",async({page})=>{
   await page.goto("/#screen=day&date=2026-07-27");
   await page.getByRole("button",{name:"Food",exact:true}).click();
