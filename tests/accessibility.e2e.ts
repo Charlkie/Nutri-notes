@@ -259,7 +259,8 @@ test("official menu energy can be saved without inventing unpublished macros",as
   await page.getByRole("button",{name:"Food",exact:true}).click();
   await page.getByRole("button",{name:/Import label/i}).click();
   await page.getByRole("button",{name:/Australian fast food/i}).click();
-  await page.getByRole("button",{name:/McDonald's.*Add from official menu kJ/i}).click();
+  await page.getByRole("button",{name:/McDonald's.*2 menu items.*offline/i}).click();
+  await page.getByRole("searchbox",{name:/Search McDonald's menu/i}).fill("Official energy test burger");
   await page.getByRole("button",{name:"Add from official menu kJ"}).click();
   await page.getByLabel("Food name").fill("Official energy test burger");
   await page.getByRole("button",{name:/Energy unit kcal/}).click();

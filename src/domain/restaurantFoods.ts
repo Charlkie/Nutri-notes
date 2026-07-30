@@ -34,9 +34,37 @@ const oporto = (name: string, grams: number | undefined, calories: number, prote
 const nandosSource={kind:"restaurant" as const,provider:"Nando's Australia nutritional information",datasetVersion:"Checked July 2026",importedAt:"2026-07-30T00:00:00.000Z",sourceUrl:"https://www.nandos.com.au/menu-item"};
 const nandos=(name:string,grams:number,calories:number,protein:number,carbohydrates:number,fat:number):RestaurantFood=>({restaurant:"Nando's",name,brand:"Nando's",categoryId:"other",calculationMode:"perServing",baseQuantity:1,baseUnit:"serving",servingDescription:`1 serve (${grams} g)`,servingGrams:grams,calories,protein,carbohydrates,fat,notes:"Bundled from Nando's Australia published nutrition information. Menu recipes and portions can change; verify against the current restaurant listing.",source:nandosSource});
 
+const mcdonaldsDessertsSource = {
+  kind: "restaurant" as const,
+  provider: "McDonald's Australia Quality Assurance",
+  datasetVersion: "Desserts and Condiments · June 2026 · revision 11",
+  importedAt: "2026-07-30T00:00:00.000Z",
+  sourceUrl: "https://www.mcdonalds.com/content/dam/sites/au/nfl/our-impact/food-quality-sourcing/Aus%20Dessert%20and%20Condiments_Jun%202026%20%281%29.pdf",
+};
+
+const mcdonaldsDessert = (name: string, servingDescription: string, servingGrams: number, calories: number, protein: number, carbohydrates: number, fat: number): RestaurantFood => ({
+  restaurant: "McDonald's",
+  name,
+  brand: "McDonald's",
+  categoryId: "other",
+  calculationMode: "perServing",
+  baseQuantity: 1,
+  baseUnit: "serving",
+  servingDescription,
+  servingGrams,
+  calories,
+  protein,
+  carbohydrates,
+  fat,
+  notes: "Imported from McDonald's Australia published nutrition information. Standard formulations and portions can change; verify against the current official document.",
+  source: mcdonaldsDessertsSource,
+});
+
 // Curated starter catalogue from published Australian restaurant nutrition data.
 // It is intentionally small, source-labelled and editable rather than presented as universal nutritional advice.
 export const restaurantFoods: RestaurantFood[] = [
+  mcdonaldsDessert("Birthday Cake – Ice Cream Cake", "1 slice (44 g)", 44, 81, 0.8, 12.5, 2.9),
+  mcdonaldsDessert("Honey", "1 packet (13 g)", 13, 44, 0, 10.8, 0),
   oporto("Chicken Rappa", 276, 420, 27, 34, 19),
   oporto("Chicken Rappsnacker", 160, 340, 17, 44, 10),
   oporto("Quarter Chicken", 179, 300, 42, 3, 13),
