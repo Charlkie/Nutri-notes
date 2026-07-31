@@ -105,7 +105,7 @@ test("the tracking page contains vertical scrolling above the bottom navigation"
   expect(safeBottom.measured).toBeGreaterThanOrEqual(0);
   expect(safeBottom.measured).toBeLessThanOrEqual(34);
   expect(safeBottom.applied).toBe(safeBottom.measured);
-  expect(initialNavigation!.height).toBeLessThanOrEqual(102);
+  expect(initialNavigation!.height).toBe(78);
 });
 
 test("calendar presents a vertically scrollable run of months",async({page})=>{
