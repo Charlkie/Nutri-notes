@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
@@ -3717,6 +3717,7 @@ function ChartsScreen({
               </div>
               <CombinedTrendChart
                 nutrition={trendItems}
+                nutritionLabel={trend === "calories" ? "Calories" : trend === "protein" ? "Protein" : trend === "carbohydrates" ? "Carbs" : "Fat"}
                 nutritionUnit={trend === "calories" ? unit : "g"}
                 weights={showWeight ? dailyWeights : []}
                 weightUnit={weightUnit}
@@ -3766,6 +3767,7 @@ function ChartsScreen({
 }
 function CombinedTrendChart({
   nutrition,
+  nutritionLabel,
   nutritionUnit,
   weights,
   weightUnit,
@@ -3775,6 +3777,7 @@ function CombinedTrendChart({
   duration,
 }: {
   nutrition: { date: string; value: number }[];
+  nutritionLabel: string;
   nutritionUnit: string;
   weights: ReturnType<typeof aggregateWeightsByDay>;
   weightUnit: WeightUnit;
@@ -3783,6 +3786,13 @@ function CombinedTrendChart({
   rangeTo: string;
   duration: TrendDuration;
 }) {
+  const [selectedPoint, setSelectedPoint] = useState<{
+    date: string;
+    series: "nutrition" | "weight";
+  }>();
+  useEffect(() => {
+    setSelectedPoint(undefined);
+  }, [duration, nutritionLabel, nutritionUnit, rangeFrom, rangeTo, weightAggregation, weightUnit]);
   const plotLeft = 42;
   const plotRight = 318;
   const plotTop = 28;
@@ -3831,6 +3841,41 @@ function CombinedTrendChart({
   const tickDates = [...new Set([0, 1, 2, 3].map((index) =>
     isoDate(addDays(new Date(`${rangeFrom}T12:00:00`), Math.round((rangeDays * index) / 3))),
   ))];
+  const selectedNutrition = selectedPoint
+    ? nutrition.find((item) => item.date === selectedPoint.date)
+    : undefined;
+  const selectedWeight = selectedPoint
+    ? weights.find((item) => item.date === selectedPoint.date)
+    : undefined;
+  const activePoint = selectedPoint && (selectedNutrition || selectedWeight)
+    ? selectedPoint
+    : undefined;
+  const selectedY = activePoint?.series === "weight" && selectedWeight
+    ? weightY(selectedWeight.averageKg)
+    : selectedNutrition
+      ? nutritionY(selectedNutrition.value)
+      : selectedWeight
+        ? weightY(selectedWeight.averageKg)
+        : plotBottom;
+  const tooltipLeft = activePoint
+    ? (Math.max(84, Math.min(x(activePoint.date), 276)) / 360) * 100
+    : 50;
+  const tooltipTop = (Math.max(plotTop + 58, selectedY) / 270) * 100;
+  const selectPoint = (date: string, series: "nutrition" | "weight") => {
+    setSelectedPoint((current) => current?.date === date && current.series === series
+      ? undefined
+      : { date, series });
+  };
+  const pointKeyDown = (
+    event: KeyboardEvent<SVGGElement>,
+    date: string,
+    series: "nutrition" | "weight",
+  ) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      selectPoint(date, series);
+    }
+  };
   return (
     <div
       className="analytics-line analytics-line-large"
@@ -3838,26 +3883,66 @@ function CombinedTrendChart({
       data-range-from={rangeFrom}
       data-range-to={rangeTo}
     >
-      <svg
-        viewBox="0 0 360 270"
-        role="img"
-        aria-label={`Combined trend from ${rangeFrom} to ${rangeTo} with ${nutrition.length} nutrition days and ${weights.length} weight days`}
-      >
-        {[0, 1, 2, 3, 4].map((index) => {
-          const y = plotTop + ((plotBottom - plotTop) * index) / 4;
-          return <line key={`grid-${index}`} x1={plotLeft} y1={y} x2={plotRight} y2={y} />;
-        })}
-        {nutrition.length > 1 && <polyline className="nutrition-series" points={nutritionLine} />}
-        {nutrition.map((item) => <circle className="nutrition-dot" key={`nutrition-${item.date}`} cx={x(item.date)} cy={nutritionY(item.value)} r="3" />)}
-        {weights.length > 1 && <polyline className="weight-series" points={weightLine} />}
-        {weightAggregation === "range" && weights.map((item) => (
-          <g className="weight-range" key={`range-${item.date}`}>
-            <line x1={x(item.date)} x2={x(item.date)} y1={weightY(item.maxKg)} y2={weightY(item.minKg)} />
-            <line x1={x(item.date) - 4} x2={x(item.date) + 4} y1={weightY(item.maxKg)} y2={weightY(item.maxKg)} />
-            <line x1={x(item.date) - 4} x2={x(item.date) + 4} y1={weightY(item.minKg)} y2={weightY(item.minKg)} />
-          </g>
-        ))}
-        {weights.map((item) => <circle className="weight-dot" key={`weight-${item.date}`} cx={x(item.date)} cy={weightY(item.averageKg)} r="3" />)}
+      <div className="chart-canvas">
+        <svg
+          viewBox="0 0 360 270"
+          role="group"
+          aria-label={`Combined trend from ${rangeFrom} to ${rangeTo} with ${nutrition.length} nutrition days and ${weights.length} weight days`}
+        >
+          {[0, 1, 2, 3, 4].map((index) => {
+            const y = plotTop + ((plotBottom - plotTop) * index) / 4;
+            return <line key={`grid-${index}`} x1={plotLeft} y1={y} x2={plotRight} y2={y} />;
+          })}
+          {nutrition.length > 1 && <polyline className="nutrition-series" points={nutritionLine} />}
+          {nutrition.map((item) => {
+            const pointLabel = `${nutritionLabel} on ${format(new Date(`${item.date}T12:00:00`), "d MMMM yyyy")}: ${item.value.toFixed(nutritionUnit === "g" ? 1 : 0)} ${nutritionUnit}`;
+            const selected = activePoint?.date === item.date && activePoint.series === "nutrition";
+            return (
+              <g
+                className={`chart-point-target${selected ? " selected" : ""}`}
+                key={`nutrition-${item.date}`}
+                role="button"
+                tabIndex={0}
+                aria-label={pointLabel}
+                aria-pressed={selected}
+                onClick={() => selectPoint(item.date, "nutrition")}
+                onKeyDown={(event) => pointKeyDown(event, item.date, "nutrition")}
+              >
+                <circle className="chart-point-hit" cx={x(item.date)} cy={nutritionY(item.value)} r="21" />
+                <circle className="nutrition-dot" cx={x(item.date)} cy={nutritionY(item.value)} r={selected ? "5" : "3"} />
+              </g>
+            );
+          })}
+          {weights.length > 1 && <polyline className="weight-series" points={weightLine} />}
+          {weightAggregation === "range" && weights.map((item) => (
+            <g className="weight-range" key={`range-${item.date}`}>
+              <line x1={x(item.date)} x2={x(item.date)} y1={weightY(item.maxKg)} y2={weightY(item.minKg)} />
+              <line x1={x(item.date) - 4} x2={x(item.date) + 4} y1={weightY(item.maxKg)} y2={weightY(item.maxKg)} />
+              <line x1={x(item.date) - 4} x2={x(item.date) + 4} y1={weightY(item.minKg)} y2={weightY(item.minKg)} />
+            </g>
+          ))}
+          {weights.map((item) => {
+            const average = displayWeight(item.averageKg, weightUnit).toFixed(1);
+            const minimum = displayWeight(item.minKg, weightUnit).toFixed(1);
+            const maximum = displayWeight(item.maxKg, weightUnit).toFixed(1);
+            const pointLabel = `Weight on ${format(new Date(`${item.date}T12:00:00`), "d MMMM yyyy")}: average ${average} ${weightUnit}, minimum ${minimum}, maximum ${maximum}, ${item.count} ${item.count === 1 ? "reading" : "readings"}`;
+            const selected = activePoint?.date === item.date && activePoint.series === "weight";
+            return (
+              <g
+                className={`chart-point-target${selected ? " selected" : ""}`}
+                key={`weight-${item.date}`}
+                role="button"
+                tabIndex={0}
+                aria-label={pointLabel}
+                aria-pressed={selected}
+                onClick={() => selectPoint(item.date, "weight")}
+                onKeyDown={(event) => pointKeyDown(event, item.date, "weight")}
+              >
+                <circle className="chart-point-hit" cx={x(item.date)} cy={weightY(item.averageKg)} r="21" />
+                <circle className="weight-dot" cx={x(item.date)} cy={weightY(item.averageKg)} r={selected ? "5" : "3"} />
+              </g>
+            );
+          })}
         {nutrition.length > 0 && (
           <>
             <text className="nutrition-axis" x="38" y={plotTop + 4} textAnchor="end">{nutritionMax.toFixed(nutritionUnit === "g" ? 1 : 0)}</text>
@@ -3872,18 +3957,44 @@ function CombinedTrendChart({
             <text className="weight-axis" x="322" y={plotBottom + 4}>{weightFloor.toFixed(1)}</text>
           </>
         )}
-        {tickDates.map((date, index) => (
-          <text
-            className="date-axis"
-            key={date}
-            x={x(date)}
-            y="252"
-            textAnchor={index === 0 ? "start" : index === tickDates.length - 1 ? "end" : "middle"}
+          {tickDates.map((date, index) => (
+            <text
+              className="date-axis"
+              key={date}
+              x={x(date)}
+              y="252"
+              textAnchor={index === 0 ? "start" : index === tickDates.length - 1 ? "end" : "middle"}
+            >
+              {format(new Date(`${date}T12:00:00`), rangeDays <= 14 ? "d MMM" : "MMM d")}
+            </text>
+          ))}
+        </svg>
+        {activePoint && (
+          <div
+            className={`chart-point-tooltip ${activePoint.series}`}
+            role="status"
+            aria-live="polite"
+            style={{ left: `${tooltipLeft}%`, top: `${tooltipTop}%` }}
           >
-            {format(new Date(`${date}T12:00:00`), rangeDays <= 14 ? "d MMM" : "MMM d")}
-          </text>
-        ))}
-      </svg>
+            <span>{format(new Date(`${activePoint.date}T12:00:00`), "EEE, d MMM yyyy")}</span>
+            {selectedNutrition && (
+              <strong>
+                {nutritionLabel} {selectedNutrition.value.toFixed(nutritionUnit === "g" ? 1 : 0)} {nutritionUnit}
+              </strong>
+            )}
+            {selectedWeight && (
+              <>
+                <strong>Weight {displayWeight(selectedWeight.averageKg, weightUnit).toFixed(1)} {weightUnit} average</strong>
+                {weightAggregation === "range" && (
+                  <small>
+                    {displayWeight(selectedWeight.minKg, weightUnit).toFixed(1)}–{displayWeight(selectedWeight.maxKg, weightUnit).toFixed(1)} {weightUnit} · {selectedWeight.count} {selectedWeight.count === 1 ? "reading" : "readings"}
+                  </small>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
       <p className="chart-legend">
         {nutrition.length > 0 && <span><i className="nutrition-key" />Nutrition ({nutritionUnit})</span>}
         {weights.length > 0 && <span><i className="weight-key" />Weight ({weightUnit}){weightAggregation === "range" ? " · whiskers show min–max" : ""}</span>}

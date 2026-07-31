@@ -217,6 +217,70 @@
   min-height: 285px;
 }
 
+.chart-canvas {
+  position: relative;
+}
+
+.analytics-line .chart-point-hit {
+  fill: transparent;
+  stroke: none;
+  pointer-events: all;
+}
+
+.chart-point-target {
+  cursor: pointer;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chart-point-target .nutrition-dot,
+.chart-point-target .weight-dot {
+  pointer-events: none;
+  transition: r 120ms ease, stroke-width 120ms ease, filter 120ms ease;
+}
+
+.chart-point-target.selected .nutrition-dot,
+.chart-point-target.selected .weight-dot,
+.chart-point-target:focus-visible .nutrition-dot,
+.chart-point-target:focus-visible .weight-dot {
+  stroke-width: 3;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+.chart-point-tooltip {
+  position: absolute;
+  z-index: 2;
+  width: max-content;
+  min-width: 142px;
+  max-width: 205px;
+  transform: translate(-50%, calc(-100% - 11px));
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 11px;
+  border: 1px solid var(--blue);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-3) 94%, transparent);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+  color: var(--text);
+  pointer-events: none;
+}
+
+.chart-point-tooltip.weight {
+  border-color: var(--accent);
+}
+
+.chart-point-tooltip span,
+.chart-point-tooltip small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.chart-point-tooltip strong {
+  font-size: 11px;
+  line-height: 1.3;
+}
+
 .analytics-line polyline.nutrition-series {
   stroke: var(--blue);
 }
@@ -259,7 +323,7 @@
   font-weight: 600;
 }
 
-.analytics-line > div {
+.analytics-line > div:not(.chart-canvas) {
   padding: 0 28px;
 }
 
