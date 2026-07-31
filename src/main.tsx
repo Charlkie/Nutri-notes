@@ -1,6 +1,7 @@
 import ReactDOM from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
 import App from "./App";
+import { installSafeAreaMeasurement } from "./viewport";
 import "./styles.css";
 import "./milestone.css";
 import "./calendar.css";
@@ -29,5 +30,6 @@ import "./accessibility.css";
 import "./dropbox.css";
 import "./viewportFix.css";
 
+installSafeAreaMeasurement();
 registerSW({ immediate: true });
 ReactDOM.createRoot(document.getElementById("root")!).render(<App />);

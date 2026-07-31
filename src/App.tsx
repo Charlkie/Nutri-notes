@@ -3796,7 +3796,8 @@ function CombinedTrendChart({
   const plotLeft = 42;
   const plotRight = 318;
   const plotTop = 28;
-  const plotBottom = 228;
+  const plotBottom = 452;
+  const chartHeight = 500;
   const rangeDays = Math.max(
     differenceInCalendarDays(
       new Date(`${rangeTo}T12:00:00`),
@@ -3854,17 +3855,6 @@ function CombinedTrendChart({
   const activePoint = selectedPoint && (selectedNutrition || selectedWeight)
     ? selectedPoint
     : undefined;
-  const selectedY = activePoint?.series === "weight" && selectedWeight
-    ? weightY(selectedWeight.averageKg)
-    : selectedNutrition
-      ? nutritionY(selectedNutrition.value)
-      : selectedWeight
-        ? weightY(selectedWeight.averageKg)
-        : plotBottom;
-  const tooltipLeft = activePoint
-    ? (Math.max(84, Math.min(x(activePoint.date), 276)) / 360) * 100
-    : 50;
-  const tooltipTop = (Math.max(plotTop + 58, selectedY) / 270) * 100;
   const selectPoint = (date: string, series: "nutrition" | "weight") => {
     setSelectedPoint((current) => current?.date === date && current.series === series
       ? undefined
@@ -3877,27 +3867,30 @@ function CombinedTrendChart({
     });
   };
   const scrubbing = useRef(false);
-  const scrubToPointer = (event: ReactPointerEvent<SVGRectElement>) => {
-    const svg = event.currentTarget.ownerSVGElement;
-    if (!svg || !availableDates.length) return;
-    const bounds = svg.getBoundingClientRect();
+  const scrubToPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!availableDates.length) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
     const pointerX = ((event.clientX - bounds.left) / bounds.width) * 360;
     const nearest = availableDates.reduce((closest, date) =>
       Math.abs(x(date) - pointerX) < Math.abs(x(closest) - pointerX) ? date : closest,
     );
     selectDate(nearest);
   };
-  const startScrubbing = (event: ReactPointerEvent<SVGRectElement>) => {
+  const startScrubbing = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.preventDefault();
     scrubbing.current = true;
     event.currentTarget.setPointerCapture(event.pointerId);
     scrubToPointer(event);
   };
-  const moveScrubber = (event: ReactPointerEvent<SVGRectElement>) => {
-    if (scrubbing.current) scrubToPointer(event);
-  };
-  const stopScrubbing = (event: ReactPointerEvent<SVGRectElement>) => {
+  const moveScrubber = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!scrubbing.current) return;
+    event.preventDefault();
+    scrubToPointer(event);
+  };
+  const stopScrubbing = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!scrubbing.current) return;
+    event.preventDefault();
     scrubToPointer(event);
     scrubbing.current = false;
     if (event.currentTarget.hasPointerCapture(event.pointerId))
@@ -3933,11 +3926,18 @@ function CombinedTrendChart({
       data-range-to={rangeTo}
     >
       <div className="chart-canvas">
-        <svg
-          viewBox="0 0 360 270"
-          role="group"
-          aria-label={`Combined trend from ${rangeFrom} to ${rangeTo} with ${nutrition.length} nutrition days and ${weights.length} weight days. Drag horizontally to inspect the nearest day.`}
+        <div
+          className="chart-gesture-surface"
+          onPointerDown={startScrubbing}
+          onPointerMove={moveScrubber}
+          onPointerUp={stopScrubbing}
+          onPointerCancel={() => { scrubbing.current = false; }}
         >
+          <svg
+            viewBox={`0 0 360 ${chartHeight}`}
+            role="group"
+            aria-label={`Combined trend from ${rangeFrom} to ${rangeTo} with ${nutrition.length} nutrition days and ${weights.length} weight days. Drag horizontally to inspect the nearest day.`}
+          >
           {[0, 1, 2, 3, 4].map((index) => {
             const y = plotTop + ((plotBottom - plotTop) * index) / 4;
             return <line key={`grid-${index}`} x1={plotLeft} y1={y} x2={plotRight} y2={y} />;
@@ -4011,7 +4011,7 @@ function CombinedTrendChart({
               className="date-axis"
               key={date}
               x={x(date)}
-              y="252"
+              y="480"
               textAnchor={index === 0 ? "start" : index === tickDates.length - 1 ? "end" : "middle"}
             >
               {format(new Date(`${date}T12:00:00`), rangeDays <= 14 ? "d MMM" : "MMM d")}
@@ -4026,25 +4026,21 @@ function CombinedTrendChart({
               y2={plotBottom}
             />
           )}
-          <rect
-            className="chart-scrub-hit-area"
-            x={plotLeft}
-            y={plotTop}
-            width={plotRight - plotLeft}
-            height={plotBottom - plotTop}
-            aria-hidden="true"
-            onPointerDown={startScrubbing}
-            onPointerMove={moveScrubber}
-            onPointerUp={stopScrubbing}
-            onPointerCancel={() => { scrubbing.current = false; }}
-          />
-        </svg>
+            <rect
+              className="chart-scrub-hit-area"
+              x={plotLeft}
+              y={plotTop}
+              width={plotRight - plotLeft}
+              height={plotBottom - plotTop}
+              aria-hidden="true"
+            />
+          </svg>
+        </div>
         {activePoint && (
           <div
             className={`chart-point-tooltip ${activePoint.series}`}
             role="status"
             aria-live="polite"
-            style={{ left: `${tooltipLeft}%`, top: `${tooltipTop}%` }}
           >
             <span>{format(new Date(`${activePoint.date}T12:00:00`), "EEE, d MMM yyyy")}</span>
             {selectedNutrition && (

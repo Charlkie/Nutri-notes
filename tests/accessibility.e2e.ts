@@ -98,12 +98,14 @@ test("the tracking page contains vertical scrolling above the bottom navigation"
   const initialNavigation = await navigation.boundingBox();
   expect(initialNavigation).not.toBeNull();
   expect(initialNavigation!.y + initialNavigation!.height).toBeCloseTo(viewport!.height, 0);
-  await page.evaluate(() =>
-    document.documentElement.style.setProperty("--safe-bottom-raw", "120px"),
-  );
-  await expect(navigation).toHaveCSS("height", "108px");
-  const cappedNavigation = await navigation.boundingBox();
-  expect(cappedNavigation!.y + cappedNavigation!.height).toBeCloseTo(viewport!.height, 0);
+  const safeBottom = await page.evaluate(() => ({
+    measured: Number(document.documentElement.dataset.safeBottom),
+    applied: Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--safe-bottom")),
+  }));
+  expect(safeBottom.measured).toBeGreaterThanOrEqual(0);
+  expect(safeBottom.measured).toBeLessThanOrEqual(34);
+  expect(safeBottom.applied).toBe(safeBottom.measured);
+  expect(initialNavigation!.height).toBeLessThanOrEqual(102);
 });
 
 test("calendar presents a vertically scrollable run of months",async({page})=>{
@@ -466,17 +468,28 @@ test("weight CSV import preserves same-day readings and overlays nutrition trend
   await weightPoint.press("Enter");
   await expect(chartTooltip).toContainText("Weight 68.8 kg average");
   await expect(chartTooltip).toContainText("68.4–69.2 kg · 2 readings");
-  const scrubArea = page.locator(".chart-scrub-hit-area");
+  const scrubArea = page.locator(".chart-gesture-surface");
+  await expect(scrubArea).toHaveCSS("touch-action", "none");
+  await scrubArea.scrollIntoViewIfNeeded();
   const scrubBounds = await scrubArea.boundingBox();
   expect(scrubBounds).not.toBeNull();
-  await page.mouse.move(scrubBounds!.x + scrubBounds!.width - 2, scrubBounds!.y + scrubBounds!.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(scrubBounds!.x + 2, scrubBounds!.y + scrubBounds!.height / 2, { steps: 5 });
-  await page.mouse.up();
+  const chartScroll = page.locator(".auxiliary-overlay");
+  const chartScrollBefore = await chartScroll.evaluate((element) => element.scrollTop);
+  await swipeScreen(
+    page,
+    { x: scrubBounds!.x + scrubBounds!.width / 2, y: scrubBounds!.y + scrubBounds!.height * 0.6 },
+    { x: scrubBounds!.x + scrubBounds!.width / 2, y: scrubBounds!.y + scrubBounds!.height * 0.4 },
+  );
+  expect(await chartScroll.evaluate((element) => element.scrollTop)).toBe(chartScrollBefore);
+  await swipeScreen(
+    page,
+    { x: scrubBounds!.x + scrubBounds!.width - 2, y: scrubBounds!.y + scrubBounds!.height / 2 },
+    { x: scrubBounds!.x + 2, y: scrubBounds!.y + scrubBounds!.height / 2 },
+  );
   await expect(page.locator(".chart-scrubber")).toHaveCount(1);
   await expect(chartTooltip).toContainText("Thu, 30 Jul 2026");
   await expect(page.getByText("Drag across the graph to inspect the nearest day")).toBeVisible();
-  expect((await page.locator(".analytics-line-large svg").boundingBox())?.height).toBeGreaterThan(280);
+  expect((await page.locator(".analytics-line-large svg").boundingBox())?.height).toBeGreaterThanOrEqual(420);
   await duration.getByRole("button", { name: "Custom" }).click();
   await expect(page.getByLabel("From", { exact: true })).toBeVisible();
   await expect(page.getByLabel("To", { exact: true })).toBeVisible();

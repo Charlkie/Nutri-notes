@@ -214,18 +214,36 @@
 
 .analytics-line-large svg {
   width: 100%;
-  min-height: 285px;
+  height: clamp(420px, 60dvh, 600px);
 }
 
 .chart-canvas {
   position: relative;
 }
 
+.analytics-line > .chart-canvas {
+  display: block;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+.chart-gesture-surface,
+.chart-canvas svg {
+  touch-action: none;
+}
+
+.chart-gesture-surface {
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .chart-scrub-hit-area {
   fill: transparent;
   stroke: none;
   pointer-events: all;
-  touch-action: pan-y;
+  touch-action: none;
   cursor: col-resize;
   -webkit-tap-highlight-color: transparent;
 }

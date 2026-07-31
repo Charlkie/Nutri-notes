@@ -1,9 +1,7 @@
 /*
- * Some standalone iOS launches briefly report an implausibly large bottom
- * safe-area inset. Keep the real portrait inset, but prevent that transient
- * value from stretching the tab bar far above the home indicator.
+ * JavaScript measures the iOS inset before React mounts and writes a concrete
+ * pixel value here. The env() value is only a no-script/early-paint fallback.
  */
 :root {
-  --safe-bottom-raw: env(safe-area-inset-bottom, 0px);
-  --safe-bottom: min(var(--safe-bottom-raw), 40px);
+  --safe-bottom: 0px;
 }
