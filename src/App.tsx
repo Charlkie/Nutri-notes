@@ -4961,7 +4961,7 @@ function BottomNav({
         position: "fixed",
         left: 0,
         right: 0,
-        bottom: 0,
+        bottom: "calc(-1 * var(--viewport-bottom-gap, 0px))",
         height: "78px",
         minHeight: "78px",
         padding: "4px 7px 0",

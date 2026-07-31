@@ -31,5 +31,21 @@ import "./dropbox.css";
 import "./viewportFix.css";
 
 installSafeAreaMeasurement();
-registerSW({ immediate: true });
+let controllerReloading = false;
+navigator.serviceWorker?.addEventListener("controllerchange", () => {
+  if (controllerReloading) return;
+  controllerReloading = true;
+  location.reload();
+});
+let applyServiceWorkerUpdate: ((reloadPage?: boolean) => Promise<void>) | undefined;
+applyServiceWorkerUpdate = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    void applyServiceWorkerUpdate?.(true);
+  },
+  onRegisteredSW(_url, registration) {
+    void registration?.update();
+    addEventListener("pageshow", () => void registration?.update());
+  },
+});
 ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
