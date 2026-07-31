@@ -74,6 +74,9 @@ test("horizontal swipes change days and secondary screens minimise to the tracke
 });
 
 test("the tracking page contains vertical scrolling above the bottom navigation",async({page})=>{
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "standalone", { configurable: true, get: () => true });
+  });
   await page.goto("/#screen=day&date=2026-07-27");
   const screen=page.locator(".day-carousel-panel:not([aria-hidden]) .day-screen");
   await screen.waitFor();
@@ -105,7 +108,8 @@ test("the tracking page contains vertical scrolling above the bottom navigation"
   expect(safeBottom.measured).toBeGreaterThanOrEqual(0);
   expect(safeBottom.measured).toBeLessThanOrEqual(34);
   expect(safeBottom.applied).toBe(safeBottom.measured);
-  expect(initialNavigation!.height).toBe(78);
+  expect(initialNavigation!.height).toBeCloseTo(68 + safeBottom.measured, 0);
+  expect(await page.evaluate(() => document.documentElement.dataset.standalone)).toBe("true");
 });
 
 test("calendar presents a vertically scrollable run of months",async({page})=>{

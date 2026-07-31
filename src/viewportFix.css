@@ -4,20 +4,31 @@
  */
 :root {
   --safe-bottom: 0px;
-  --viewport-bottom-gap: 0px;
 }
 
-/* Keep the tab bar anchored to the viewport itself on first-launch iOS. */
+/*
+ * Installed iOS web apps can incorrectly subtract both safe-area insets from
+ * 100dvh. In standalone mode, 100vh represents the full app canvas. Keeping
+ * the locked tracking shell on that canvas lets bottom: 0 reach the display
+ * edge; the navigation's padding keeps its controls above the home indicator.
+ */
+html[data-standalone="true"].tracking-scroll-locked,
+html[data-standalone="true"].tracking-scroll-locked body,
+html[data-standalone="true"].tracking-scroll-locked #root,
+html[data-standalone="true"] .tracking-active {
+  height: 100vh;
+}
+
 .bottom-nav {
   position: fixed !important;
-  inset: auto 0 calc(-1 * var(--viewport-bottom-gap)) !important;
+  inset: auto 0 0 !important;
   left: 0 !important;
   right: 0 !important;
   margin: 0 auto !important;
   transform: none !important;
-  height: 78px !important;
-  min-height: 78px !important;
-  padding: 4px 7px 0 !important;
+  height: calc(var(--nav) + var(--safe-bottom)) !important;
+  min-height: calc(var(--nav) + var(--safe-bottom)) !important;
+  padding: 5px 7px var(--safe-bottom) !important;
 }
 
 .day-edit-mode .bottom-nav {
