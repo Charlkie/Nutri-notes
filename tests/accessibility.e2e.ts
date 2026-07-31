@@ -429,14 +429,22 @@ test("weight CSV import preserves same-day readings and overlays nutrition trend
 
   await page.getByRole("button", { name: "Charts", exact: true }).click();
   await page.getByRole("button", { name: "Trends" }).click();
+  const duration = page.getByRole("group", { name: "Chart duration" });
+  await expect(duration.getByRole("button", { name: "30D" })).toHaveAttribute("aria-pressed", "true");
+  await duration.getByRole("button", { name: "7D" }).click();
   await page.getByRole("button", { name: "Planned" }).click();
   await page.getByRole("button", { name: "Weight" }).click();
+  await expect(page.locator(".analytics-line-large")).toHaveAttribute("data-duration", "7");
   await expect(page.getByText("Nutrition (kcal)")).toBeVisible();
   await expect(page.getByText("Weight (kg)")).toBeVisible();
   await expect(page.locator(".analytics-line .weight-series")).toBeVisible();
   await page.getByRole("button", { name: "Min–max" }).click();
   await expect(page.locator(".analytics-line .weight-range")).toHaveCount(2);
   await expect(page.getByText(/whiskers show min–max/)).toBeVisible();
+  expect((await page.locator(".analytics-line-large svg").boundingBox())?.height).toBeGreaterThan(280);
+  await duration.getByRole("button", { name: "Custom" }).click();
+  await expect(page.getByLabel("From", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("To", { exact: true })).toBeVisible();
   await expectNoSeriousViolations(page);
 });
 

@@ -4,6 +4,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import {
   addDays,
   addMonths,
+  differenceInCalendarDays,
   format,
   isSameDay,
   isSameMonth,
@@ -3397,6 +3398,7 @@ function WeightImportDialog({
 }
 type ChartPeriod = "all" | "year" | "month" | "week" | "day" | "custom";
 type NutritionTrend = "calories" | "protein" | "carbohydrates" | "fat";
+type TrendDuration = 7 | 14 | 30 | 90 | "all" | "custom";
 function ChartsScreen({
   categories,
   weightUnit,
@@ -3407,6 +3409,7 @@ function ChartsScreen({
   const { unit } = useEnergyDisplay();
   const [tab, setTab] = useState<"breakdown" | "trends" | "foods">("breakdown");
   const [period, setPeriod] = useState<ChartPeriod>("all");
+  const [trendDuration, setTrendDuration] = useState<TrendDuration>(30);
   const [customFrom, setCustomFrom] = useState(
     isoDate(subDays(new Date(), 30)),
   );
@@ -3439,10 +3442,28 @@ function ChartsScreen({
     week: isoDate(startOfWeek(today, { weekStartsOn: 1 })),
     day: isoDate(today),
   };
-  const inRange = (date: string) =>
+  const allDates = [
+    ...(analytics?.items ?? []).map((item) => item.date),
+    ...(analytics?.weights ?? []).map((item) => item.date),
+  ].sort();
+  const trendTo = trendDuration === "custom"
+    ? customTo
+    : trendDuration === "all"
+      ? (allDates.at(-1) ?? isoDate(today))
+      : isoDate(today);
+  const trendFrom = trendDuration === "custom"
+    ? customFrom
+    : trendDuration === "all"
+      ? (allDates[0] ?? trendTo)
+      : isoDate(subDays(new Date(`${trendTo}T12:00:00`), trendDuration - 1));
+  const periodInRange = (date: string) =>
     period === "all" || period === "custom"
       ? period === "all" || (date >= customFrom && date <= customTo)
       : date >= starts[period];
+  const inRange = (date: string) =>
+    tab === "trends"
+      ? date >= trendFrom && date <= trendTo
+      : periodInRange(date);
   const items = (analytics?.items ?? []).filter((item) => inRange(item.date));
   const weights = (analytics?.weights ?? []).filter((item) =>
     inRange(item.date),
@@ -3526,21 +3547,37 @@ function ChartsScreen({
           Foods
         </button>
       </div>
-      <div className="period-tabs">
-        {(
-          ["all", "year", "month", "week", "day", "custom"] as ChartPeriod[]
-        ).map((value) => (
-          <button
-            key={value}
-            className={period === value ? "active" : ""}
-            onClick={() => setPeriod(value)}
-          >
-            {value[0]?.toUpperCase()}
-            {value.slice(1)}
-          </button>
-        ))}
-      </div>
-      {period === "custom" && (
+      {tab === "trends" ? (
+        <div className="trend-duration-tabs" role="group" aria-label="Chart duration">
+          {([7, 14, 30, 90, "all", "custom"] as TrendDuration[]).map((value) => (
+            <button
+              key={value}
+              className={trendDuration === value ? "active" : ""}
+              aria-pressed={trendDuration === value}
+              onClick={() => setTrendDuration(value)}
+            >
+              {typeof value === "number" ? `${value}D` : value === "all" ? "All" : "Custom"}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="period-tabs">
+          {(
+            ["all", "year", "month", "week", "day", "custom"] as ChartPeriod[]
+          ).map((value) => (
+            <button
+              key={value}
+              className={period === value ? "active" : ""}
+              onClick={() => setPeriod(value)}
+            >
+              {value[0]?.toUpperCase()}
+              {value.slice(1)}
+            </button>
+          ))}
+        </div>
+      )}
+      {((tab === "trends" && trendDuration === "custom") ||
+        (tab !== "trends" && period === "custom")) && (
         <div className="custom-range">
           <label>
             From
@@ -3662,7 +3699,7 @@ function ChartsScreen({
             <>
               <div className="trend-heading combined-heading">
                 <div>
-                  <span>{trendScope === "consumed" ? "Consumed" : "Planned"} {trend === "carbohydrates" ? "carbs" : trend}</span>
+                  <span>{trendScope === "consumed" ? "Consumed" : "Planned"} {trend === "carbohydrates" ? "carbs" : trend} · {trendDuration === "custom" ? "custom range" : trendDuration === "all" ? "all data" : `${trendDuration} days`}</span>
                   <strong>{latestNutrition ? `${latestNutrition.value.toFixed(trend === "calories" ? 0 : 1)} ${trend === "calories" ? unit : "g"}` : "No data"}</strong>
                 </div>
                 {showWeight && (
@@ -3684,6 +3721,9 @@ function ChartsScreen({
                 weights={showWeight ? dailyWeights : []}
                 weightUnit={weightUnit}
                 weightAggregation={weightAggregation}
+                rangeFrom={trendFrom}
+                rangeTo={trendTo}
+                duration={trendDuration}
               />
             </>
           ) : (
@@ -3730,20 +3770,49 @@ function CombinedTrendChart({
   weights,
   weightUnit,
   weightAggregation,
+  rangeFrom,
+  rangeTo,
+  duration,
 }: {
   nutrition: { date: string; value: number }[];
   nutritionUnit: string;
   weights: ReturnType<typeof aggregateWeightsByDay>;
   weightUnit: WeightUnit;
   weightAggregation: "average" | "range";
+  rangeFrom: string;
+  rangeTo: string;
+  duration: TrendDuration;
 }) {
-  const dates = [...new Set([...nutrition.map((item) => item.date), ...weights.map((item) => item.date)])].sort();
+  const plotLeft = 42;
+  const plotRight = 318;
+  const plotTop = 28;
+  const plotBottom = 228;
+  const rangeDays = Math.max(
+    differenceInCalendarDays(
+      new Date(`${rangeTo}T12:00:00`),
+      new Date(`${rangeFrom}T12:00:00`),
+    ),
+    0,
+  );
   const x = (date: string) => {
-    const index = dates.indexOf(date);
-    return dates.length === 1 ? 180 : 38 + (index / (dates.length - 1)) * 284;
+    if (!rangeDays) return (plotLeft + plotRight) / 2;
+    const offset = differenceInCalendarDays(
+      new Date(`${date}T12:00:00`),
+      new Date(`${rangeFrom}T12:00:00`),
+    );
+    return plotLeft + (Math.max(0, Math.min(offset, rangeDays)) / rangeDays) * (plotRight - plotLeft);
   };
-  const nutritionMax = Math.max(...nutrition.map((item) => item.value), 1);
-  const nutritionY = (value: number) => 122 - (value / nutritionMax) * 88;
+  const niceStep = (span: number, intervals = 4) => {
+    const rough = Math.max(span / intervals, Number.EPSILON);
+    const power = 10 ** Math.floor(Math.log10(rough));
+    const fraction = rough / power;
+    const factor = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 2.5 ? 2.5 : fraction <= 5 ? 5 : 10;
+    return factor * power;
+  };
+  const nutritionPeak = Math.max(...nutrition.map((item) => item.value), 1);
+  const nutritionStep = niceStep(nutritionPeak);
+  const nutritionMax = Math.ceil(nutritionPeak / nutritionStep) * nutritionStep;
+  const nutritionY = (value: number) => plotBottom - (value / nutritionMax) * (plotBottom - plotTop);
   const displayedWeightValues = weights.flatMap((item) => [
     displayWeight(item.minKg, weightUnit),
     displayWeight(item.maxKg, weightUnit),
@@ -3751,23 +3820,33 @@ function CombinedTrendChart({
   const weightMin = displayedWeightValues.length ? Math.min(...displayedWeightValues) : 0;
   const weightMax = displayedWeightValues.length ? Math.max(...displayedWeightValues) : 1;
   const weightPadding = Math.max((weightMax - weightMin) * 0.12, weightUnit === "kg" ? 0.3 : 0.7);
-  const weightFloor = weightMin - weightPadding;
-  const weightCeiling = weightMax + weightPadding;
+  const weightStep = niceStep(Math.max(weightMax - weightMin + weightPadding * 2, 1));
+  const weightFloor = Math.floor((weightMin - weightPadding) / weightStep) * weightStep;
+  const weightCeiling = Math.ceil((weightMax + weightPadding) / weightStep) * weightStep;
   const weightRange = Math.max(weightCeiling - weightFloor, 1);
   const weightY = (valueKg: number) =>
-    122 - ((displayWeight(valueKg, weightUnit) - weightFloor) / weightRange) * 88;
+    plotBottom - ((displayWeight(valueKg, weightUnit) - weightFloor) / weightRange) * (plotBottom - plotTop);
   const nutritionLine = nutrition.map((item) => `${x(item.date)},${nutritionY(item.value)}`).join(" ");
   const weightLine = weights.map((item) => `${x(item.date)},${weightY(item.averageKg)}`).join(" ");
+  const tickDates = [...new Set([0, 1, 2, 3].map((index) =>
+    isoDate(addDays(new Date(`${rangeFrom}T12:00:00`), Math.round((rangeDays * index) / 3))),
+  ))];
   return (
-    <div className="analytics-line">
+    <div
+      className="analytics-line analytics-line-large"
+      data-duration={String(duration)}
+      data-range-from={rangeFrom}
+      data-range-to={rangeTo}
+    >
       <svg
-        viewBox="0 0 360 150"
+        viewBox="0 0 360 270"
         role="img"
-        aria-label={`Combined trend with ${nutrition.length} nutrition days and ${weights.length} weight days`}
+        aria-label={`Combined trend from ${rangeFrom} to ${rangeTo} with ${nutrition.length} nutrition days and ${weights.length} weight days`}
       >
-        <line x1="38" y1="34" x2="322" y2="34" />
-        <line x1="38" y1="78" x2="322" y2="78" />
-        <line x1="38" y1="122" x2="322" y2="122" />
+        {[0, 1, 2, 3, 4].map((index) => {
+          const y = plotTop + ((plotBottom - plotTop) * index) / 4;
+          return <line key={`grid-${index}`} x1={plotLeft} y1={y} x2={plotRight} y2={y} />;
+        })}
         {nutrition.length > 1 && <polyline className="nutrition-series" points={nutritionLine} />}
         {nutrition.map((item) => <circle className="nutrition-dot" key={`nutrition-${item.date}`} cx={x(item.date)} cy={nutritionY(item.value)} r="3" />)}
         {weights.length > 1 && <polyline className="weight-series" points={weightLine} />}
@@ -3781,23 +3860,30 @@ function CombinedTrendChart({
         {weights.map((item) => <circle className="weight-dot" key={`weight-${item.date}`} cx={x(item.date)} cy={weightY(item.averageKg)} r="3" />)}
         {nutrition.length > 0 && (
           <>
-            <text className="nutrition-axis" x="34" y="38" textAnchor="end">{nutritionMax.toFixed(nutritionUnit === "g" ? 1 : 0)}</text>
-            <text className="nutrition-axis" x="34" y="126" textAnchor="end">0</text>
+            <text className="nutrition-axis" x="38" y={plotTop + 4} textAnchor="end">{nutritionMax.toFixed(nutritionUnit === "g" ? 1 : 0)}</text>
+            <text className="nutrition-axis" x="38" y={(plotTop + plotBottom) / 2 + 4} textAnchor="end">{(nutritionMax / 2).toFixed(nutritionUnit === "g" ? 1 : 0)}</text>
+            <text className="nutrition-axis" x="38" y={plotBottom + 4} textAnchor="end">0</text>
           </>
         )}
         {weights.length > 0 && (
           <>
-            <text className="weight-axis" x="326" y="38">{weightCeiling.toFixed(1)}</text>
-            <text className="weight-axis" x="326" y="126">{weightFloor.toFixed(1)}</text>
+            <text className="weight-axis" x="322" y={plotTop + 4}>{weightCeiling.toFixed(1)}</text>
+            <text className="weight-axis" x="322" y={(plotTop + plotBottom) / 2 + 4}>{((weightCeiling + weightFloor) / 2).toFixed(1)}</text>
+            <text className="weight-axis" x="322" y={plotBottom + 4}>{weightFloor.toFixed(1)}</text>
           </>
         )}
+        {tickDates.map((date, index) => (
+          <text
+            className="date-axis"
+            key={date}
+            x={x(date)}
+            y="252"
+            textAnchor={index === 0 ? "start" : index === tickDates.length - 1 ? "end" : "middle"}
+          >
+            {format(new Date(`${date}T12:00:00`), rangeDays <= 14 ? "d MMM" : "MMM d")}
+          </text>
+        ))}
       </svg>
-      <div>
-        <span>{format(new Date(`${dates[0]}T12:00:00`), "d MMM")}</span>
-        <span>
-          {format(new Date(`${dates.at(-1)}T12:00:00`), "d MMM")}
-        </span>
-      </div>
       <p className="chart-legend">
         {nutrition.length > 0 && <span><i className="nutrition-key" />Nutrition ({nutritionUnit})</span>}
         {weights.length > 0 && <span><i className="weight-key" />Weight ({weightUnit}){weightAggregation === "range" ? " · whiskers show min–max" : ""}</span>}

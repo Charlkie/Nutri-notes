@@ -127,6 +127,37 @@
   overflow-x: auto;
 }
 
+.trend-duration-tabs {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3px;
+  min-height: 54px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.trend-duration-tabs button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.trend-duration-tabs button.active {
+  background: var(--surface-3);
+  color: var(--text);
+  font-weight: 750;
+}
+
+.charts-screen .custom-range input {
+  min-height: 44px;
+  font-size: 16px;
+}
+
 .compact-toggle {
   display: flex;
   flex: none;
@@ -177,6 +208,15 @@
   overflow: visible;
 }
 
+.analytics-line-large {
+  padding: 4px 8px 26px;
+}
+
+.analytics-line-large svg {
+  width: 100%;
+  min-height: 285px;
+}
+
 .analytics-line polyline.nutrition-series {
   stroke: var(--blue);
 }
@@ -211,6 +251,12 @@
 
 .analytics-line .weight-axis {
   fill: var(--accent);
+}
+
+.analytics-line .date-axis {
+  fill: var(--muted);
+  font-size: 8px;
+  font-weight: 600;
 }
 
 .analytics-line > div {
