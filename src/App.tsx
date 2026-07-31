@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
@@ -3841,6 +3841,10 @@ function CombinedTrendChart({
   const tickDates = [...new Set([0, 1, 2, 3].map((index) =>
     isoDate(addDays(new Date(`${rangeFrom}T12:00:00`), Math.round((rangeDays * index) / 3))),
   ))];
+  const availableDates = [...new Set([
+    ...nutrition.map((item) => item.date),
+    ...weights.map((item) => item.date),
+  ])].sort();
   const selectedNutrition = selectedPoint
     ? nutrition.find((item) => item.date === selectedPoint.date)
     : undefined;
@@ -3866,6 +3870,39 @@ function CombinedTrendChart({
       ? undefined
       : { date, series });
   };
+  const selectDate = (date: string) => {
+    setSelectedPoint({
+      date,
+      series: nutrition.some((item) => item.date === date) ? "nutrition" : "weight",
+    });
+  };
+  const scrubbing = useRef(false);
+  const scrubToPointer = (event: ReactPointerEvent<SVGRectElement>) => {
+    const svg = event.currentTarget.ownerSVGElement;
+    if (!svg || !availableDates.length) return;
+    const bounds = svg.getBoundingClientRect();
+    const pointerX = ((event.clientX - bounds.left) / bounds.width) * 360;
+    const nearest = availableDates.reduce((closest, date) =>
+      Math.abs(x(date) - pointerX) < Math.abs(x(closest) - pointerX) ? date : closest,
+    );
+    selectDate(nearest);
+  };
+  const startScrubbing = (event: ReactPointerEvent<SVGRectElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    scrubbing.current = true;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    scrubToPointer(event);
+  };
+  const moveScrubber = (event: ReactPointerEvent<SVGRectElement>) => {
+    if (scrubbing.current) scrubToPointer(event);
+  };
+  const stopScrubbing = (event: ReactPointerEvent<SVGRectElement>) => {
+    if (!scrubbing.current) return;
+    scrubToPointer(event);
+    scrubbing.current = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
+  };
   const pointKeyDown = (
     event: KeyboardEvent<SVGGElement>,
     date: string,
@@ -3874,6 +3911,18 @@ function CombinedTrendChart({
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       selectPoint(date, series);
+      return;
+    }
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight" || event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      const current = Math.max(0, availableDates.indexOf(activePoint?.date ?? date));
+      const next = event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? availableDates.length - 1
+          : Math.max(0, Math.min(availableDates.length - 1, current + (event.key === "ArrowLeft" ? -1 : 1)));
+      const nextDate = availableDates[next];
+      if (nextDate) selectDate(nextDate);
     }
   };
   return (
@@ -3887,7 +3936,7 @@ function CombinedTrendChart({
         <svg
           viewBox="0 0 360 270"
           role="group"
-          aria-label={`Combined trend from ${rangeFrom} to ${rangeTo} with ${nutrition.length} nutrition days and ${weights.length} weight days`}
+          aria-label={`Combined trend from ${rangeFrom} to ${rangeTo} with ${nutrition.length} nutrition days and ${weights.length} weight days. Drag horizontally to inspect the nearest day.`}
         >
           {[0, 1, 2, 3, 4].map((index) => {
             const y = plotTop + ((plotBottom - plotTop) * index) / 4;
@@ -3896,7 +3945,7 @@ function CombinedTrendChart({
           {nutrition.length > 1 && <polyline className="nutrition-series" points={nutritionLine} />}
           {nutrition.map((item) => {
             const pointLabel = `${nutritionLabel} on ${format(new Date(`${item.date}T12:00:00`), "d MMMM yyyy")}: ${item.value.toFixed(nutritionUnit === "g" ? 1 : 0)} ${nutritionUnit}`;
-            const selected = activePoint?.date === item.date && activePoint.series === "nutrition";
+            const selected = activePoint?.date === item.date;
             return (
               <g
                 className={`chart-point-target${selected ? " selected" : ""}`}
@@ -3926,7 +3975,7 @@ function CombinedTrendChart({
             const minimum = displayWeight(item.minKg, weightUnit).toFixed(1);
             const maximum = displayWeight(item.maxKg, weightUnit).toFixed(1);
             const pointLabel = `Weight on ${format(new Date(`${item.date}T12:00:00`), "d MMMM yyyy")}: average ${average} ${weightUnit}, minimum ${minimum}, maximum ${maximum}, ${item.count} ${item.count === 1 ? "reading" : "readings"}`;
-            const selected = activePoint?.date === item.date && activePoint.series === "weight";
+            const selected = activePoint?.date === item.date;
             return (
               <g
                 className={`chart-point-target${selected ? " selected" : ""}`}
@@ -3968,6 +4017,27 @@ function CombinedTrendChart({
               {format(new Date(`${date}T12:00:00`), rangeDays <= 14 ? "d MMM" : "MMM d")}
             </text>
           ))}
+          {activePoint && (
+            <line
+              className="chart-scrubber"
+              x1={x(activePoint.date)}
+              x2={x(activePoint.date)}
+              y1={plotTop}
+              y2={plotBottom}
+            />
+          )}
+          <rect
+            className="chart-scrub-hit-area"
+            x={plotLeft}
+            y={plotTop}
+            width={plotRight - plotLeft}
+            height={plotBottom - plotTop}
+            aria-hidden="true"
+            onPointerDown={startScrubbing}
+            onPointerMove={moveScrubber}
+            onPointerUp={stopScrubbing}
+            onPointerCancel={() => { scrubbing.current = false; }}
+          />
         </svg>
         {activePoint && (
           <div
@@ -3995,6 +4065,7 @@ function CombinedTrendChart({
           </div>
         )}
       </div>
+      <p className="chart-scrub-hint">Drag across the graph to inspect the nearest day</p>
       <p className="chart-legend">
         {nutrition.length > 0 && <span><i className="nutrition-key" />Nutrition ({nutritionUnit})</span>}
         {weights.length > 0 && <span><i className="weight-key" />Weight ({weightUnit}){weightAggregation === "range" ? " · whiskers show min–max" : ""}</span>}

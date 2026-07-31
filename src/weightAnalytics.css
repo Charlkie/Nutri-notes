@@ -221,6 +221,29 @@
   position: relative;
 }
 
+.chart-scrub-hit-area {
+  fill: transparent;
+  stroke: none;
+  pointer-events: all;
+  touch-action: pan-y;
+  cursor: col-resize;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.analytics-line .chart-scrubber {
+  stroke: rgb(244 247 248 / 58%);
+  stroke-width: 1.25;
+  stroke-dasharray: 3 3;
+  pointer-events: none;
+}
+
+.chart-scrub-hint {
+  margin: -2px 8px 8px;
+  color: var(--muted);
+  font-size: 9px;
+  text-align: center;
+}
+
 .analytics-line .chart-point-hit {
   fill: transparent;
   stroke: none;
@@ -248,15 +271,15 @@
 }
 
 .chart-point-tooltip {
-  position: absolute;
-  z-index: 2;
-  width: max-content;
-  min-width: 142px;
-  max-width: 205px;
-  transform: translate(-50%, calc(-100% - 11px));
+  position: static;
+  width: calc(100% - 16px);
+  min-width: 0;
+  max-width: none;
+  transform: none;
   display: flex;
   flex-direction: column;
   gap: 3px;
+  margin: 3px 8px 9px;
   padding: 9px 11px;
   border: 1px solid var(--blue);
   border-radius: 10px;

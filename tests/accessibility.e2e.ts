@@ -93,6 +93,17 @@ test("the tracking page contains vertical scrolling above the bottom navigation"
   expect(contained.clientHeight).toBe(metrics.viewport);
   expect(contained.scrollTop).toBeGreaterThan(0);
   expect(await page.evaluate(()=>window.scrollY)).toBe(0);
+  const navigation = page.getByRole("navigation", { name: "Primary navigation" });
+  const viewport = page.viewportSize();
+  const initialNavigation = await navigation.boundingBox();
+  expect(initialNavigation).not.toBeNull();
+  expect(initialNavigation!.y + initialNavigation!.height).toBeCloseTo(viewport!.height, 0);
+  await page.evaluate(() =>
+    document.documentElement.style.setProperty("--safe-bottom-raw", "120px"),
+  );
+  await expect(navigation).toHaveCSS("height", "108px");
+  const cappedNavigation = await navigation.boundingBox();
+  expect(cappedNavigation!.y + cappedNavigation!.height).toBeCloseTo(viewport!.height, 0);
 });
 
 test("calendar presents a vertically scrollable run of months",async({page})=>{
@@ -439,12 +450,13 @@ test("weight CSV import preserves same-day readings and overlays nutrition trend
   await expect(page.getByText("Weight (kg)")).toBeVisible();
   await expect(page.locator(".analytics-line .weight-series")).toBeVisible();
   const nutritionPoint = page.getByRole("button", { name: /Calories on 31 July 2026:/ });
-  await nutritionPoint.click();
+  await nutritionPoint.focus();
+  await nutritionPoint.press("Enter");
   const chartTooltip = page.locator(".chart-point-tooltip");
   await expect(chartTooltip).toContainText("Fri, 31 Jul 2026");
   await expect(chartTooltip).toContainText(/Calories \d+ kcal/);
   await expect(chartTooltip).toContainText("Weight 68.8 kg average");
-  await nutritionPoint.click();
+  await nutritionPoint.press("Enter");
   await expect(chartTooltip).toHaveCount(0);
   await page.getByRole("button", { name: "Min–max" }).click();
   await expect(page.locator(".analytics-line .weight-range")).toHaveCount(2);
@@ -454,6 +466,16 @@ test("weight CSV import preserves same-day readings and overlays nutrition trend
   await weightPoint.press("Enter");
   await expect(chartTooltip).toContainText("Weight 68.8 kg average");
   await expect(chartTooltip).toContainText("68.4–69.2 kg · 2 readings");
+  const scrubArea = page.locator(".chart-scrub-hit-area");
+  const scrubBounds = await scrubArea.boundingBox();
+  expect(scrubBounds).not.toBeNull();
+  await page.mouse.move(scrubBounds!.x + scrubBounds!.width - 2, scrubBounds!.y + scrubBounds!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(scrubBounds!.x + 2, scrubBounds!.y + scrubBounds!.height / 2, { steps: 5 });
+  await page.mouse.up();
+  await expect(page.locator(".chart-scrubber")).toHaveCount(1);
+  await expect(chartTooltip).toContainText("Thu, 30 Jul 2026");
+  await expect(page.getByText("Drag across the graph to inspect the nearest day")).toBeVisible();
   expect((await page.locator(".analytics-line-large svg").boundingBox())?.height).toBeGreaterThan(280);
   await duration.getByRole("button", { name: "Custom" }).click();
   await expect(page.getByLabel("From", { exact: true })).toBeVisible();

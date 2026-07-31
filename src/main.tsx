@@ -27,6 +27,7 @@ import "./auxiliaryNavigation.css";
 import "./schedules.css";
 import "./accessibility.css";
 import "./dropbox.css";
+import "./viewportFix.css";
 
 registerSW({ immediate: true });
 ReactDOM.createRoot(document.getElementById("root")!).render(<App />);

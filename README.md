@@ -109,7 +109,7 @@ diff -u src/domain/gygMenu.generated.ts <(node scripts/import-gyg.mjs)
 - Touch-safe long-press entry selection and persistent drag reordering for days and templates
 - Monday-first nutrition-history calendar with category dots, month navigation and read-only day previews
 - Local body-weight logging with notes, editing, undoable deletion, mapped CSV import, same-day timestamp preservation, trends and seven-day averages
-- Local analytics with category/macro breakdowns, selectable planned/consumed nutrition trends, 7/14/30/90-day or custom chart windows, daily average or min–max weight aggregation, large dual-axis nutrition/weight overlays, date filters and food rankings
+- Local analytics with category/macro breakdowns, selectable planned/consumed nutrition trends, 7/14/30/90-day or custom chart windows, drag-to-scrub nearest-day inspection, daily average or min–max weight aggregation, large dual-axis nutrition/weight overlays, date filters and food rankings
 - Validated versioned JSON backup/restore and spreadsheet-compatible CSV exports
 - Native share-sheet backups for saving JSON to Files, iCloud Drive, Google Drive, Dropbox, AirDrop, or another compatible app, with a direct-download fallback
 - Optional per-user Dropbox App Folder connection with PKCE, debounced automatic backups, offline retry, dated versions, manual backup, reviewed restore, status reporting, and token revocation on disconnect
@@ -182,7 +182,7 @@ The Body tab stores timestamped kilogram measurements and optional notes locally
 
 ## Charts milestone
 
-The Charts tab calculates analytics on demand from immutable day snapshots and weight entries. It includes category and macro calorie breakdowns, planned or consumed daily calorie/macro trends, body-weight trends, and a large dual-axis overlay that can show weight beside any selected nutrition metric. Trend windows can be set to the rolling last 7, 14, 30, or 90 days, all recorded data, or a custom date range; points are positioned by their real date within that window. When a day has multiple measurements, weight can be plotted as its average or as min–max whiskers around the daily average. Food frequency/contribution statistics and the broader All/Year/Month/Week/Day/custom filters remain available on the other analytics tabs.
+The Charts tab calculates analytics on demand from immutable day snapshots and weight entries. It includes category and macro calorie breakdowns, planned or consumed daily calorie/macro trends, body-weight trends, and a large dual-axis overlay that can show weight beside any selected nutrition metric. Trend windows can be set to the rolling last 7, 14, 30, or 90 days, all recorded data, or a custom date range; points are positioned by their real date within that window. Dragging horizontally across the plot moves a vertical guide to the nearest recorded day, enlarges every point on that date, and shows a combined readout below the graph. The same inspector supports arrow, Home, and End keys. When a day has multiple measurements, weight can be plotted as its average or as min–max whiskers around the daily average. Food frequency/contribution statistics and the broader All/Year/Month/Week/Day/custom filters remain available on the other analytics tabs.
 
 ## Data-portability milestone
 
