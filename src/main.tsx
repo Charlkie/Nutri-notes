@@ -31,18 +31,19 @@ import "./dropbox.css";
 import "./viewportFix.css";
 
 installSafeAreaMeasurement();
+const hadServiceWorkerControllerAtStartup = Boolean(navigator.serviceWorker?.controller);
 let controllerReloading = false;
 navigator.serviceWorker?.addEventListener("controllerchange", () => {
+  // A first-time service-worker install also emits controllerchange. Reloading in
+  // that case interrupts the initial app session; only reload when an existing
+  // installed app has genuinely switched to a newer worker.
+  if (!hadServiceWorkerControllerAtStartup) return;
   if (controllerReloading) return;
   controllerReloading = true;
   location.reload();
 });
-let applyServiceWorkerUpdate: ((reloadPage?: boolean) => Promise<void>) | undefined;
-applyServiceWorkerUpdate = registerSW({
+registerSW({
   immediate: true,
-  onNeedRefresh() {
-    void applyServiceWorkerUpdate?.(true);
-  },
   onRegisteredSW(_url, registration) {
     void registration?.update();
     addEventListener("pageshow", () => void registration?.update());
