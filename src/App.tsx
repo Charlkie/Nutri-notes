@@ -4954,7 +4954,20 @@ function BottomNav({
     ["settings", Settings, "Settings"],
   ];
   return createPortal(
-    <nav className="bottom-nav" aria-label="Primary navigation">
+    <nav
+      className="bottom-nav"
+      aria-label="Primary navigation"
+      style={{
+        position: "fixed",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: "78px",
+        minHeight: "78px",
+        padding: "4px 7px 0",
+        transform: "none",
+      }}
+    >
       {items.map(([route, Icon, label]) => (
         <button
           key={route}
