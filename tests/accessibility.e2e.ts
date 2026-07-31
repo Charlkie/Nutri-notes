@@ -439,6 +439,9 @@ test("weight CSV import preserves same-day readings and overlays nutrition trend
   await page.getByRole("button", { name: "Import measurements" }).click();
   await expect(page.getByText("Imported 3 weight measurements")).toBeVisible();
   await expect(page.locator(".weight-history article")).toHaveCount(3);
+  await expect(page.locator(".weight-chart svg")).toHaveCSS("height", /3\d\dpx/);
+  await page.getByRole("button", { name: /31 July 2026: 68\.8 kg/ }).click();
+  await expect(page.locator(".body-chart-readout")).toContainText("68.8 kg");
 
   await page.getByRole("button", { name: "Charts", exact: true }).click();
   await page.getByRole("button", { name: "Trends" }).click();
@@ -458,6 +461,11 @@ test("weight CSV import preserves same-day readings and overlays nutrition trend
   await expect(chartTooltip).toContainText("Fri, 31 Jul 2026");
   await expect(chartTooltip).toContainText(/Calories \d+ kcal/);
   await expect(chartTooltip).toContainText("Weight 68.8 kg average");
+  const tooltipBounds = await chartTooltip.boundingBox();
+  const chartViewport = page.viewportSize();
+  expect(tooltipBounds).not.toBeNull();
+  expect(tooltipBounds!.y).toBeGreaterThanOrEqual(0);
+  expect(tooltipBounds!.y + tooltipBounds!.height).toBeLessThanOrEqual(chartViewport!.height);
   await nutritionPoint.press("Enter");
   await expect(chartTooltip).toHaveCount(0);
   await page.getByRole("button", { name: "Min–max" }).click();

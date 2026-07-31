@@ -710,6 +710,10 @@ function DayScreen({
   const [nameConflict, setNameConflict] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(()=>new Set());
   useEffect(() => { if(!active)setSelectedIds(new Set()); }, [active,date]);
+  useEffect(() => {
+    document.documentElement.classList.toggle("day-edit-mode", active && selectedIds.size > 0);
+    return () => document.documentElement.classList.remove("day-edit-mode");
+  }, [active, selectedIds.size]);
   const sensors = useSensors(
     useSensor(TouchSensor, {
       activationConstraint: { distance: 4 },
@@ -3153,6 +3157,7 @@ function WeightTrend({
   points: ReturnType<typeof withSevenDayAverage>;
   unit: WeightUnit;
 }) {
+  const [selectedId, setSelectedId] = useState<string>();
   const recent = points.slice(-30);
   if (!recent.length) return null;
   const values = recent.flatMap((point) => [
@@ -3166,9 +3171,10 @@ function WeightTrend({
     recent
       .map(
         (point, index) =>
-          `${18 + (index / Math.max(recent.length - 1, 1)) * 324},${116 - ((point[key] - min) / range) * 88}`,
+          `${18 + (index / Math.max(recent.length - 1, 1)) * 324},${360 - ((point[key] - min) / range) * 300}`,
       )
       .join(" ");
+  const selected = recent.find((point) => point.id === selectedId);
   return (
     <section
       className="weight-chart"
@@ -3183,13 +3189,13 @@ function WeightTrend({
         </span>
       </header>
       <svg
-        viewBox="0 0 360 135"
+        viewBox="0 0 360 390"
         role="img"
         aria-label={`Weight from ${displayWeight(recent[0]?.weightKg ?? 0, unit).toFixed(1)} to ${displayWeight(recent.at(-1)?.weightKg ?? 0, unit).toFixed(1)} ${unit}`}
       >
-        <line x1="18" y1="28" x2="342" y2="28" />
-        <line x1="18" y1="72" x2="342" y2="72" />
-        <line x1="18" y1="116" x2="342" y2="116" />
+        <line x1="18" y1="40" x2="342" y2="40" />
+        <line x1="18" y1="200" x2="342" y2="200" />
+        <line x1="18" y1="360" x2="342" y2="360" />
         <polyline
           className="average-line"
           points={coords("rollingAverageKg")}
@@ -3199,11 +3205,28 @@ function WeightTrend({
           <circle
             key={point.id}
             cx={18 + (index / Math.max(recent.length - 1, 1)) * 324}
-            cy={116 - ((point.weightKg - min) / range) * 88}
-            r="3"
+            cy={360 - ((point.weightKg - min) / range) * 300}
+            r={selected?.id === point.id ? "6" : "4"}
+            className={selected?.id === point.id ? "selected" : undefined}
+            role="button"
+            tabIndex={0}
+            aria-label={`${format(new Date(`${point.date}T12:00:00`), "d MMMM yyyy")}: ${displayWeight(point.weightKg, unit).toFixed(1)} ${unit}; 7-day average ${displayWeight(point.rollingAverageKg, unit).toFixed(1)} ${unit}`}
+            onClick={() => setSelectedId(point.id)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setSelectedId(point.id);
+              }
+            }}
           />
         ))}
       </svg>
+      {selected && (
+        <div className="body-chart-readout" role="status" aria-live="polite">
+          <strong>{format(new Date(`${selected.date}T12:00:00`), "EEE, d MMM yyyy")}</strong>
+          <span>{displayWeight(selected.weightKg, unit).toFixed(1)} {unit} · 7-day average {displayWeight(selected.rollingAverageKg, unit).toFixed(1)} {unit}</span>
+        </div>
+      )}
     </section>
   );
 }
@@ -4930,7 +4953,7 @@ function BottomNav({
     ["charts", BarChart3, "Charts"],
     ["settings", Settings, "Settings"],
   ];
-  return (
+  return createPortal(
     <nav className="bottom-nav" aria-label="Primary navigation">
       {items.map(([route, Icon, label]) => (
         <button
@@ -4943,6 +4966,7 @@ function BottomNav({
           <span>{label}</span>
         </button>
       ))}
-    </nav>
+    </nav>,
+    document.body,
   );
 }
