@@ -39,7 +39,6 @@ import {
   CalendarDays,
   CalendarRange,
   Check,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleHelp,
@@ -627,7 +626,7 @@ export default function App() {
           }}
         />
       )}
-      {route === "calendar" && <AuxiliaryOverlay label="Calendar" onMinimise={goDay}>
+      {route === "calendar" && <AuxiliaryOverlay label="Calendar">
         <CalendarScreen
           selectedDate={selectedDate}
           categories={categories}
@@ -637,27 +636,24 @@ export default function App() {
             setSelectedDate(d);
             setRoute("day");
           }}
+          onClose={goDay}
         />
       </AuxiliaryOverlay>}
-      {route === "body" && <AuxiliaryOverlay label="Body" onMinimise={goDay}>
-        <BodyScreen unit={appSettings.weightUnit} onToast={setToast} />
+      {route === "body" && <AuxiliaryOverlay label="Body">
+        <BodyScreen unit={appSettings.weightUnit} onToast={setToast} onClose={goDay} />
       </AuxiliaryOverlay>}
-      {route === "charts" && <AuxiliaryOverlay label="Charts" onMinimise={goDay}><ChartsScreen categories={categories} weightUnit={appSettings.weightUnit} /></AuxiliaryOverlay>}
-      {route === "settings" && <AuxiliaryOverlay label="Settings" onMinimise={goDay}>
+      {route === "charts" && <AuxiliaryOverlay label="Charts"><ChartsScreen categories={categories} weightUnit={appSettings.weightUnit} onClose={goDay} /></AuxiliaryOverlay>}
+      {route === "settings" && <AuxiliaryOverlay label="Settings">
         <SettingsScreen
           categories={categories}
           settings={appSettings}
           dropbox={dropbox}
           googleDrive={googleDrive}
           onToast={setToast}
+          onClose={goDay}
         />
       </AuxiliaryOverlay>}
-      {route !== "picker" &&
-        route !== "foodForm" &&
-        route !== "foodImport" &&
-        route !== "entryForm" &&
-        route !== "recipeEntry" &&
-        route !== "templateEditor" && <BottomNav active={route} onNav={nav} />}
+      {route === "day" && <BottomNav active={route} onNav={nav} />}
       {toast && (
         <div className="toast" role="status">
           <span>{toast.message}</span>
@@ -2719,12 +2715,14 @@ function CalendarScreen({
   weekStartsOn,
   onSelectDate,
   onOpenDay,
+  onClose,
 }: {
   selectedDate: Date;
   categories: FoodCategory[];
   weekStartsOn: 0 | 1;
   onSelectDate: (d: Date) => void;
   onOpenDay: (d: Date) => void;
+  onClose: () => void;
 }) {
   const [month, setMonth] = useState(startOfMonth(selectedDate));
   const months=useMemo(()=>Array.from({length:13},(_,index)=>addMonths(month,index-6)),[month]);
@@ -2785,11 +2783,11 @@ function CalendarScreen({
       : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   return (
     <main className="screen calendar-screen">
-      <header className="brand-bar calendar-header">
-        <span className="brand-mark">
-          <CalendarDays />
-          History
-        </span>
+      <header className="modal-header calendar-header">
+        <button className="icon-button close" onClick={onClose} aria-label="Close">
+          <X />
+        </button>
+        <h1>History</h1>
         <button
           className="today-button"
           onClick={() => {
@@ -2954,9 +2952,11 @@ function CalendarScreen({
 function BodyScreen({
   unit,
   onToast,
+  onClose,
 }: {
   unit: WeightUnit;
   onToast: (toast: Toast) => void;
+  onClose: () => void;
 }) {
   const entries = useLiveQuery(() => db.weights.toArray(), []) ?? [];
   const orderedEntries = useMemo(
@@ -3000,11 +3000,11 @@ function BodyScreen({
   };
   return (
     <main className="screen body-screen">
-      <header className="brand-bar">
-        <span className="brand-mark">
-          <Scale />
-          Body
-        </span>
+      <header className="modal-header">
+        <button className="icon-button close" onClick={onClose} aria-label="Close">
+          <X />
+        </button>
+        <h1>Body Tracker</h1>
         <div className="body-actions">
           <input
             ref={importInput}
@@ -3167,14 +3167,52 @@ function WeightTrend({
   const min = Math.min(...values) - 0.5,
     max = Math.max(...values) + 0.5,
     range = Math.max(max - min, 1);
+  const plotLeft = 18;
+  const plotRight = 342;
+  const plotTop = 40;
+  const plotBottom = 360;
+  const xAt = (index: number) =>
+    plotLeft + (index / Math.max(recent.length - 1, 1)) * (plotRight - plotLeft);
+  const yAt = (value: number) => 360 - ((value - min) / range) * 300;
   const coords = (key: "weightKg" | "rollingAverageKg") =>
-    recent
-      .map(
-        (point, index) =>
-          `${18 + (index / Math.max(recent.length - 1, 1)) * 324},${360 - ((point[key] - min) / range) * 300}`,
-      )
-      .join(" ");
+    recent.map((point, index) => `${xAt(index)},${yAt(point[key])}`).join(" ");
   const selected = recent.find((point) => point.id === selectedId);
+  const selectedIndex = selected ? recent.indexOf(selected) : -1;
+  const scrubbing = useRef(false);
+  const scrubToPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const pointerX = ((event.clientX - bounds.left) / bounds.width) * 360;
+    let nearestIndex = 0;
+    let nearestDistance = Infinity;
+    recent.forEach((_, index) => {
+      const distance = Math.abs(xAt(index) - pointerX);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestIndex = index;
+      }
+    });
+    setSelectedId(recent[nearestIndex]?.id);
+  };
+  const startScrubbing = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.preventDefault();
+    scrubbing.current = true;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    scrubToPointer(event);
+  };
+  const moveScrubber = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!scrubbing.current) return;
+    event.preventDefault();
+    scrubToPointer(event);
+  };
+  const stopScrubbing = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!scrubbing.current) return;
+    event.preventDefault();
+    scrubToPointer(event);
+    scrubbing.current = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
+  };
   return (
     <section
       className="weight-chart"
@@ -3188,45 +3226,75 @@ function WeightTrend({
           7-day average
         </span>
       </header>
-      <svg
-        viewBox="0 0 360 390"
-        role="img"
-        aria-label={`Weight from ${displayWeight(recent[0]?.weightKg ?? 0, unit).toFixed(1)} to ${displayWeight(recent.at(-1)?.weightKg ?? 0, unit).toFixed(1)} ${unit}`}
-      >
-        <line x1="18" y1="40" x2="342" y2="40" />
-        <line x1="18" y1="200" x2="342" y2="200" />
-        <line x1="18" y1="360" x2="342" y2="360" />
-        <polyline
-          className="average-line"
-          points={coords("rollingAverageKg")}
-        />
-        <polyline className="weight-line" points={coords("weightKg")} />
-        {recent.map((point, index) => (
-          <circle
-            key={point.id}
-            cx={18 + (index / Math.max(recent.length - 1, 1)) * 324}
-            cy={360 - ((point.weightKg - min) / range) * 300}
-            r={selected?.id === point.id ? "6" : "4"}
-            className={selected?.id === point.id ? "selected" : undefined}
-            role="button"
-            tabIndex={0}
-            aria-label={`${format(new Date(`${point.date}T12:00:00`), "d MMMM yyyy")}: ${displayWeight(point.weightKg, unit).toFixed(1)} ${unit}; 7-day average ${displayWeight(point.rollingAverageKg, unit).toFixed(1)} ${unit}`}
-            onClick={() => setSelectedId(point.id)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                setSelectedId(point.id);
-              }
-            }}
-          />
-        ))}
-      </svg>
+      <div className="chart-canvas">
+        <div
+          className="chart-gesture-surface"
+          onPointerDown={startScrubbing}
+          onPointerMove={moveScrubber}
+          onPointerUp={stopScrubbing}
+          onPointerCancel={() => {
+            scrubbing.current = false;
+          }}
+        >
+          <svg
+            viewBox="0 0 360 390"
+            role="img"
+            aria-label={`Weight from ${displayWeight(recent[0]?.weightKg ?? 0, unit).toFixed(1)} to ${displayWeight(recent.at(-1)?.weightKg ?? 0, unit).toFixed(1)} ${unit}. Drag horizontally to inspect a day.`}
+          >
+            <line x1="18" y1="40" x2="342" y2="40" />
+            <line x1="18" y1="200" x2="342" y2="200" />
+            <line x1="18" y1="360" x2="342" y2="360" />
+            <polyline
+              className="average-line"
+              points={coords("rollingAverageKg")}
+            />
+            <polyline className="weight-line" points={coords("weightKg")} />
+            <rect
+              className="chart-scrub-hit-area"
+              x={plotLeft}
+              y={plotTop}
+              width={plotRight - plotLeft}
+              height={plotBottom - plotTop}
+              aria-hidden="true"
+            />
+            {recent.map((point, index) => (
+              <circle
+                key={point.id}
+                cx={xAt(index)}
+                cy={yAt(point.weightKg)}
+                r={selected?.id === point.id ? "6" : "4"}
+                className={selected?.id === point.id ? "selected" : undefined}
+                role="button"
+                tabIndex={0}
+                aria-label={`${format(new Date(`${point.date}T12:00:00`), "d MMMM yyyy")}: ${displayWeight(point.weightKg, unit).toFixed(1)} ${unit}; 7-day average ${displayWeight(point.rollingAverageKg, unit).toFixed(1)} ${unit}`}
+                onClick={() => setSelectedId(point.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelectedId(point.id);
+                  }
+                }}
+              />
+            ))}
+            {selectedIndex >= 0 && (
+              <line
+                className="chart-scrubber"
+                x1={xAt(selectedIndex)}
+                x2={xAt(selectedIndex)}
+                y1={plotTop}
+                y2={plotBottom}
+              />
+            )}
+          </svg>
+        </div>
+      </div>
       {selected && (
         <div className="body-chart-readout" role="status" aria-live="polite">
           <strong>{format(new Date(`${selected.date}T12:00:00`), "EEE, d MMM yyyy")}</strong>
           <span>{displayWeight(selected.weightKg, unit).toFixed(1)} {unit} · 7-day average {displayWeight(selected.rollingAverageKg, unit).toFixed(1)} {unit}</span>
         </div>
       )}
+      <p className="chart-scrub-hint">Drag across the graph to inspect a day</p>
     </section>
   );
 }
@@ -3425,9 +3493,11 @@ type TrendDuration = 7 | 14 | 30 | 90 | "all" | "custom";
 function ChartsScreen({
   categories,
   weightUnit,
+  onClose,
 }: {
   categories: FoodCategory[];
   weightUnit: WeightUnit;
+  onClose: () => void;
 }) {
   const { unit } = useEnergyDisplay();
   const [tab, setTab] = useState<"breakdown" | "trends" | "foods">("breakdown");
@@ -3553,11 +3623,12 @@ function ChartsScreen({
   const nutritionTrendUnit = trend === "calories" ? unit : trend ? "g" : "";
   return (
     <main className="screen charts-screen">
-      <header className="brand-bar">
-        <span className="brand-mark">
-          <BarChart3 />
-          Charts
-        </span>
+      <header className="modal-header">
+        <button className="icon-button close" onClick={onClose} aria-label="Close">
+          <X />
+        </button>
+        <h1>Charts</h1>
+        <span className="header-spacer" />
       </header>
       <div className="chart-tabs">
         <button
@@ -4141,12 +4212,14 @@ function SettingsScreen({
   dropbox,
   googleDrive,
   onToast,
+  onClose,
 }: {
   categories: FoodCategory[];
   settings: AppSettings;
   dropbox: DropboxBackupController;
   googleDrive: GoogleDriveBackupController;
   onToast: (toast: Toast) => void;
+  onClose: () => void;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<BackupData>();
@@ -4250,11 +4323,12 @@ function SettingsScreen({
   };
   return (
     <main className="screen settings-screen">
-      <header className="brand-bar">
-        <span className="brand-mark">
-          <Settings />
-          Settings
-        </span>
+      <header className="modal-header">
+        <button className="icon-button close" onClick={onClose} aria-label="Close">
+          <X />
+        </button>
+        <h1>Settings</h1>
+        <span className="header-spacer" />
       </header>
       <PreferencesEditor
         settings={settings}
@@ -4959,8 +5033,8 @@ function CategoryEditor({
     </div>
   );
 }
-function AuxiliaryOverlay({label,onMinimise,children}:{label:string;onMinimise:()=>void;children:React.ReactNode}){
-  return <section className="auxiliary-overlay" aria-label={label}><button className="auxiliary-minimise" onClick={onMinimise} aria-label={`Minimise ${label}`}><ChevronDown/></button>{children}</section>;
+function AuxiliaryOverlay({label,children}:{label:string;children:React.ReactNode}){
+  return <section className="auxiliary-overlay" aria-label={label}>{children}</section>;
 }
 function BottomNav({
   active,

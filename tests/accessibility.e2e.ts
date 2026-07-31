@@ -67,10 +67,13 @@ test("horizontal swipes change days and secondary screens minimise to the tracke
   await swipeScreen(page,{x:20,y:430},{x:300,y:430});
   await expect(page.getByText("27 July 2026",{exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Body",exact:true}).click();
-  await expect(page.getByRole("button",{name:"Minimise Body"})).toBeVisible();
+  const closeBody=page.locator(".auxiliary-overlay .modal-header .close");
+  await expect(closeBody).toBeVisible();
+  await expect(page.locator(".bottom-nav")).toHaveCount(0);
   await expect(page.locator(".day-carousel-panel:not([aria-hidden]) .day-screen")).toHaveCount(1);
-  await page.getByRole("button",{name:"Minimise Body"}).click();
-  await expect(page.getByRole("button",{name:"Minimise Body"})).toHaveCount(0);
+  await closeBody.click();
+  await expect(closeBody).toHaveCount(0);
+  await expect(page.locator(".bottom-nav")).toBeVisible();
 });
 
 test("the tracking page contains vertical scrolling above the bottom navigation",async({page})=>{
@@ -462,6 +465,7 @@ test("weight CSV import preserves same-day readings and overlays nutrition trend
   await page.getByRole("button", { name: /31 July 2026: 68\.8 kg/ }).click();
   await expect(page.locator(".body-chart-readout")).toContainText("68.8 kg");
 
+  await page.locator(".auxiliary-overlay .modal-header .close").click();
   await page.getByRole("button", { name: "Charts", exact: true }).click();
   await page.getByRole("button", { name: "Trends" }).click();
   const duration = page.getByRole("group", { name: "Chart duration" });
