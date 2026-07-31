@@ -112,6 +112,21 @@ test("the tracking page contains vertical scrolling above the bottom navigation"
   expect(await page.evaluate(() => document.documentElement.dataset.standalone)).toBe("true");
 });
 
+test("trend nutrition series can be deselected", async ({ page }) => {
+  await page.goto("/#screen=charts&date=2026-07-27");
+  await page.getByRole("button", { name: "Trends" }).click();
+  const calories = page.getByRole("button", { name: "Calories" });
+  await expect(calories).toHaveAttribute("aria-pressed", "true");
+  await calories.click();
+  await expect(calories).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("heading", { name: "Choose a chart series" })).toBeVisible();
+  const protein = page.getByRole("button", { name: "Protein" });
+  await protein.click();
+  await expect(protein).toHaveAttribute("aria-pressed", "true");
+  await protein.click();
+  await expect(protein).toHaveAttribute("aria-pressed", "false");
+});
+
 test("calendar presents a vertically scrollable run of months",async({page})=>{
   await page.goto("/#screen=calendar&date=2026-07-27");
   const months=page.locator(".calendar-month-scroll");

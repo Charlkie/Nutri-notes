@@ -3440,7 +3440,7 @@ function ChartsScreen({
   const [breakdownMode, setBreakdownMode] = useState<"category" | "macros">(
     "category",
   );
-  const [trend, setTrend] = useState<NutritionTrend>("calories");
+  const [trend, setTrend] = useState<NutritionTrend | null>("calories");
   const [showWeight, setShowWeight] = useState(false);
   const [weightAggregation, setWeightAggregation] = useState<"average" | "range">("average");
   const [trendScope, setTrendScope] = useState<"consumed" | "planned">("consumed");
@@ -3533,12 +3533,24 @@ function ChartsScreen({
   );
   const foodStats = foodStatistics(items);
   const dailyWeights = aggregateWeightsByDay(weights);
-  const trendItems = days.map((day) => ({
-    date: day.date,
-    value: trend === "calories" ? energyValue(day[trend], unit) : day[trend],
-  }));
+  const trendItems = trend
+    ? days.map((day) => ({
+        date: day.date,
+        value: trend === "calories" ? energyValue(day[trend], unit) : day[trend],
+      }))
+    : [];
   const latestNutrition = trendItems.at(-1);
   const latestWeight = dailyWeights.at(-1);
+  const nutritionTrendLabel = trend === "calories"
+    ? "Calories"
+    : trend === "protein"
+      ? "Protein"
+      : trend === "carbohydrates"
+        ? "Carbs"
+        : trend === "fat"
+          ? "Fat"
+          : "Nutrition";
+  const nutritionTrendUnit = trend === "calories" ? unit : trend ? "g" : "";
   return (
     <main className="screen charts-screen">
       <header className="brand-bar">
@@ -3690,7 +3702,8 @@ function ChartsScreen({
               <button
                 key={metric}
                 className={trend === metric ? "active" : ""}
-                onClick={() => setTrend(metric)}
+                aria-pressed={trend === metric}
+                onClick={() => setTrend((current) => current === metric ? null : metric)}
               >
                 {metric === "carbohydrates"
                   ? "Carbs"
@@ -3707,10 +3720,12 @@ function ChartsScreen({
             </button>
           </div>
           <div className="trend-options">
-            <div className="compact-toggle" aria-label="Nutrition totals">
-              <button className={trendScope === "consumed" ? "active" : ""} onClick={() => setTrendScope("consumed")}>Consumed</button>
-              <button className={trendScope === "planned" ? "active" : ""} onClick={() => setTrendScope("planned")}>Planned</button>
-            </div>
+            {trend && (
+              <div className="compact-toggle" aria-label="Nutrition totals">
+                <button className={trendScope === "consumed" ? "active" : ""} onClick={() => setTrendScope("consumed")}>Consumed</button>
+                <button className={trendScope === "planned" ? "active" : ""} onClick={() => setTrendScope("planned")}>Planned</button>
+              </div>
+            )}
             {showWeight && (
               <div className="compact-toggle" aria-label="Daily weight calculation">
                 <button className={weightAggregation === "average" ? "active" : ""} onClick={() => setWeightAggregation("average")}>Average</button>
@@ -3718,13 +3733,21 @@ function ChartsScreen({
               </div>
             )}
           </div>
-          {trendItems.length || (showWeight && dailyWeights.length) ? (
+          {!trend && !showWeight ? (
+            <div className="analytics-empty chart-series-empty">
+              <BarChart3 />
+              <h2>Choose a chart series</h2>
+              <p>Select a nutrition metric or Weight above.</p>
+            </div>
+          ) : trendItems.length || (showWeight && dailyWeights.length) ? (
             <>
               <div className="trend-heading combined-heading">
-                <div>
-                  <span>{trendScope === "consumed" ? "Consumed" : "Planned"} {trend === "carbohydrates" ? "carbs" : trend} · {trendDuration === "custom" ? "custom range" : trendDuration === "all" ? "all data" : `${trendDuration} days`}</span>
-                  <strong>{latestNutrition ? `${latestNutrition.value.toFixed(trend === "calories" ? 0 : 1)} ${trend === "calories" ? unit : "g"}` : "No data"}</strong>
-                </div>
+                {trend && (
+                  <div>
+                    <span>{trendScope === "consumed" ? "Consumed" : "Planned"} {trend === "carbohydrates" ? "carbs" : trend} · {trendDuration === "custom" ? "custom range" : trendDuration === "all" ? "all data" : `${trendDuration} days`}</span>
+                    <strong>{latestNutrition ? `${latestNutrition.value.toFixed(trend === "calories" ? 0 : 1)} ${trend === "calories" ? unit : "g"}` : "No data"}</strong>
+                  </div>
+                )}
                 {showWeight && (
                   <div className="weight-heading">
                     <span>Daily weight {weightAggregation === "range" ? "range" : "average"}</span>
@@ -3740,8 +3763,8 @@ function ChartsScreen({
               </div>
               <CombinedTrendChart
                 nutrition={trendItems}
-                nutritionLabel={trend === "calories" ? "Calories" : trend === "protein" ? "Protein" : trend === "carbohydrates" ? "Carbs" : "Fat"}
-                nutritionUnit={trend === "calories" ? unit : "g"}
+                nutritionLabel={nutritionTrendLabel}
+                nutritionUnit={nutritionTrendUnit}
                 weights={showWeight ? dailyWeights : []}
                 weightUnit={weightUnit}
                 weightAggregation={weightAggregation}
