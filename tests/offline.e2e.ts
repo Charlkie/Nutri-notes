@@ -9,12 +9,12 @@ test("installed production app reloads and opens lazy features offline", async (
 
   await context.setOffline(true);
   await page.reload({ waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("button", { name: "Calendar", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.locator(".auxiliary-overlay .modal-header h1")).toHaveText("History");
 
-  await page.getByRole("button", { name: "Food", exact: true }).click();
+  await page.locator(".auxiliary-overlay .modal-header .close").click();
   const start = page.getByRole("button", { name: /Start New Day/i });
   if (await start.isVisible()) await start.click();
-  else await page.getByRole("button", { name: "Food", exact: true }).click();
+  await page.getByRole("button", { name: "Food", exact: true }).click();
   await page.getByRole("button", { name: "Recipes", exact: true }).click();
   await expect(page.getByRole("button", { name: "Log", exact: true }).first()).toBeVisible();
   expect(await page.evaluate(() => document.body.scrollWidth)).toBeLessThanOrEqual(390);
