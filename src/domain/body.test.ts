@@ -1,5 +1,5 @@
 import { describe,expect,it } from "vitest";
-import { aggregateWeightsByDay, displayWeight, weightChange, weightInputToKg, withSevenDayAverage } from "./body";
+import { aggregateWeightsByDay, displayWeight, weeklyWeightChange, weightChange, weightInputToKg, withSevenDayAverage } from "./body";
 import type { WeightEntry } from "./types";
 const weight=(date:string,weightKg:number):WeightEntry=>({id:date,date,weightKg});
 describe("body weight calculations",()=>{it("calculates a trailing seven-calendar-day average",()=>{const points=withSevenDayAverage([weight("2026-07-01",80),weight("2026-07-05",78),weight("2026-07-08",76)]);expect(points[2]?.rollingAverageKg).toBe(77);expect(points[1]?.rollingAverageKg).toBe(79)});it("calculates overall change independent of input order",()=>expect(weightChange([weight("2026-07-08",78),weight("2026-07-01",80)])).toBe(-2))});
@@ -26,5 +26,25 @@ describe("multiple daily weight readings", () => {
     ];
     expect(withSevenDayAverage(readings).at(-1)?.rollingAverageKg).toBe(69.5);
     expect(weightChange(readings)).toBe(-3);
+  });
+});
+
+describe("weekly weight change", () => {
+  it("computes a weekly rate of change from the trailing seven-day averages", () => {
+    const readings = Array.from({ length: 14 }, (_, day) =>
+      weight(`2026-07-${String(day + 1).padStart(2, "0")}`, 80 - day),
+    );
+    const rate = weeklyWeightChange(readings);
+    expect(rate?.kgPerWeek).toBeCloseTo(-7, 8);
+    expect(rate?.percentPerWeek).toBeCloseTo(-10, 8);
+  });
+
+  it("withholds a rate until entries span enough days to avoid noisy extrapolation", () => {
+    const readings = [weight("2026-07-01", 80), weight("2026-07-02", 79.5)];
+    expect(weeklyWeightChange(readings)).toBeUndefined();
+  });
+
+  it("returns undefined with fewer than two data points", () => {
+    expect(weeklyWeightChange([weight("2026-07-01", 80)])).toBeUndefined();
   });
 });

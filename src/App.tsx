@@ -74,6 +74,7 @@ import {
   Target,
   Trash2,
   TrendingDown,
+  TrendingUp,
   Upload,
   UserRound,
   Utensils,
@@ -118,6 +119,7 @@ import { monthGrid } from "./domain/calendar";
 import {
   aggregateWeightsByDay,
   displayWeight,
+  weeklyWeightChange,
   weightChange,
   weightInputToKg,
   withSevenDayAverage,
@@ -2974,11 +2976,24 @@ function BodyScreen({
     inspection: WeightCsvInspection;
   }>();
   const [editing, setEditing] = useState<WeightEntry | "new">();
+  const [rateUnit, setRateUnit] = useState<"kg" | "percent">("kg");
   const points = withSevenDayAverage(entries);
   const latest = orderedEntries.at(-1);
   const latestAverage = points.at(-1);
   const change = weightChange(entries);
+  const rate = weeklyWeightChange(entries);
   const shown = (kg: number) => displayWeight(kg, unit).toFixed(1);
+  const rateGuidance = !rate
+    ? { text: "Add more history", tone: "" }
+    : Math.abs(rate.percentPerWeek) < 0.05
+      ? { text: "Weight is stable", tone: "" }
+      : rate.percentPerWeek > 0
+        ? { text: "Trending up", tone: "" }
+        : Math.abs(rate.percentPerWeek) < 0.5
+          ? { text: "Slower than 0.5–1%/wk guideline", tone: "" }
+          : Math.abs(rate.percentPerWeek) <= 1
+            ? { text: "Within 0.5–1%/wk guideline", tone: "positive" }
+            : { text: "Faster than 0.5–1%/wk guideline", tone: "caution" };
   const loadCsv = async (file?: File) => {
     if (!file) return;
     try {
@@ -3057,6 +3072,41 @@ function BodyScreen({
                 {change === undefined
                   ? "Add another entry"
                   : `${change > 0 ? "+" : ""}${shown(change)} ${unit} overall`}
+              </span>
+            </div>
+            <div className="rate-tile">
+              <div className="rate-tile-head">
+                <small>WEEKLY RATE</small>
+                <div className="rate-toggle" role="group" aria-label="Weekly rate units">
+                  <button
+                    type="button"
+                    className={rateUnit === "kg" ? "active" : ""}
+                    aria-pressed={rateUnit === "kg"}
+                    onClick={() => setRateUnit("kg")}
+                  >
+                    {unit}
+                  </button>
+                  <button
+                    type="button"
+                    className={rateUnit === "percent" ? "active" : ""}
+                    aria-pressed={rateUnit === "percent"}
+                    onClick={() => setRateUnit("percent")}
+                  >
+                    %
+                  </button>
+                </div>
+              </div>
+              <strong>
+                {rate
+                  ? rateUnit === "kg"
+                    ? `${rate.kgPerWeek > 0 ? "+" : ""}${displayWeight(rate.kgPerWeek, unit).toFixed(2)}`
+                    : `${rate.percentPerWeek > 0 ? "+" : ""}${rate.percentPerWeek.toFixed(2)}`
+                  : "—"}{" "}
+                <em>{rateUnit === "kg" ? `${unit}/wk` : "%/wk"}</em>
+              </strong>
+              <span className={rateGuidance.tone}>
+                {rate ? (rate.percentPerWeek > 0 ? <TrendingUp /> : <TrendingDown />) : null}
+                {rateGuidance.text}
               </span>
             </div>
           </section>

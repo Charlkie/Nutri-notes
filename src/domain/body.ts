@@ -72,6 +72,34 @@ export function weightChange(entries: WeightEntry[]): number | undefined {
   return daily.at(-1)!.averageKg - daily[0]!.averageKg;
 }
 
+export interface WeeklyWeightChange {
+  kgPerWeek: number;
+  percentPerWeek: number;
+}
+
+const minRateSpanDays = 3;
+
+/**
+ * Rate of change extrapolated to a per-week figure from the trailing
+ * seven-day rolling averages, so a couple of noisy days don't swing it.
+ * Requires at least minRateSpanDays between the compared points to avoid
+ * amplifying single-day noise into a wild weekly extrapolation.
+ */
+export function weeklyWeightChange(entries: WeightEntry[]): WeeklyWeightChange | undefined {
+  const points = withSevenDayAverage(entries);
+  if (points.length < 2) return undefined;
+  const latest = points.at(-1)!;
+  const latestTime = dateMs(latest.date);
+  const targetTime = latestTime - 7 * dayMs;
+  const prior =
+    [...points].reverse().find((point) => dateMs(point.date) <= targetTime) ?? points[0]!;
+  const elapsedDays = (latestTime - dateMs(prior.date)) / dayMs;
+  if (elapsedDays < minRateSpanDays) return undefined;
+  const kgPerWeek = ((latest.rollingAverageKg - prior.rollingAverageKg) / elapsedDays) * 7;
+  const percentPerWeek = (kgPerWeek / latest.rollingAverageKg) * 100;
+  return { kgPerWeek, percentPerWeek };
+}
+
 const poundsPerKilogram = 2.2046226218;
 export const displayWeight = (kilograms: number, unit: WeightUnit): number =>
   unit === "lb" ? kilograms * poundsPerKilogram : kilograms;
