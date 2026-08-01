@@ -119,10 +119,13 @@ import { monthGrid } from "./domain/calendar";
 import {
   aggregateWeightsByDay,
   displayWeight,
+  weeklyRateSeries,
   weeklyWeightChange,
   weightChange,
   weightInputToKg,
   withSevenDayAverage,
+  type RateSpan,
+  type WeeklyRatePoint,
 } from "./domain/body";
 import {
   inspectWeightCsv,
@@ -2951,6 +2954,15 @@ function CalendarScreen({
     </main>
   );
 }
+const RATE_SPANS: { value: RateSpan; label: string }[] = [
+  { value: 7, label: "1W" },
+  { value: 14, label: "2W" },
+  { value: 28, label: "4W" },
+  { value: "all", label: "All" },
+];
+function spanCaption(span: RateSpan) {
+  return span === "all" ? "All-time comparison" : `${span / 7}-week comparison`;
+}
 function BodyScreen({
   unit,
   onToast,
@@ -2977,11 +2989,13 @@ function BodyScreen({
   }>();
   const [editing, setEditing] = useState<WeightEntry | "new">();
   const [rateUnit, setRateUnit] = useState<"kg" | "percent">("kg");
+  const [rateSpan, setRateSpan] = useState<RateSpan>(7);
   const points = withSevenDayAverage(entries);
   const latest = orderedEntries.at(-1);
   const latestAverage = points.at(-1);
   const change = weightChange(entries);
-  const rate = weeklyWeightChange(entries);
+  const rate = weeklyWeightChange(entries, rateSpan);
+  const rateSeries = weeklyRateSeries(entries, rateSpan);
   const shown = (kg: number) => displayWeight(kg, unit).toFixed(1);
   const rateGuidance = !rate
     ? { text: "Add more history", tone: "" }
@@ -3096,6 +3110,19 @@ function BodyScreen({
                   </button>
                 </div>
               </div>
+              <div className="rate-span-tabs" role="group" aria-label="Weekly rate timeframe">
+                {RATE_SPANS.map((option) => (
+                  <button
+                    key={String(option.value)}
+                    type="button"
+                    className={rateSpan === option.value ? "active" : ""}
+                    aria-pressed={rateSpan === option.value}
+                    onClick={() => setRateSpan(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
               <strong>
                 {rate
                   ? rateUnit === "kg"
@@ -3111,6 +3138,7 @@ function BodyScreen({
             </div>
           </section>
           <WeightTrend points={points} unit={unit} />
+          <RateTrend series={rateSeries} span={rateSpan} rateUnit={rateUnit} weightUnit={unit} />
           <section className="weight-history">
             <header>
               <h2>Weight history</h2>
@@ -3345,6 +3373,104 @@ function WeightTrend({
         </div>
       )}
       <p className="chart-scrub-hint">Drag across the graph to inspect a day</p>
+    </section>
+  );
+}
+function RateTrend({
+  series,
+  span,
+  rateUnit,
+  weightUnit,
+}: {
+  series: WeeklyRatePoint[];
+  span: RateSpan;
+  rateUnit: "kg" | "percent";
+  weightUnit: WeightUnit;
+}) {
+  const [selectedDate, setSelectedDate] = useState<string>();
+  const recent = series.slice(-30);
+  if (!recent.length) return null;
+  const valueOf = (point: WeeklyRatePoint) =>
+    rateUnit === "kg" ? displayWeight(point.kgPerWeek, weightUnit) : point.percentPerWeek;
+  const plotLeft = 18;
+  const plotRight = 342;
+  const plotTop = 10;
+  const plotBottom = 170;
+  const midY = (plotTop + plotBottom) / 2;
+  const maxAbs = Math.max(
+    ...recent.map((point) => Math.abs(valueOf(point))),
+    rateUnit === "percent" ? 1.2 : 0.3,
+  );
+  const xAt = (index: number) =>
+    plotLeft + (index / Math.max(recent.length - 1, 1)) * (plotRight - plotLeft);
+  const yAt = (value: number) => midY - (value / maxAbs) * (midY - plotTop);
+  const barWidth = Math.max(Math.min((plotRight - plotLeft) / recent.length - 2, 14), 2);
+  const selected = recent.find((point) => point.date === selectedDate);
+  const toneFor = (point: WeeklyRatePoint) => {
+    if (point.percentPerWeek >= 0) return "";
+    const magnitude = Math.abs(point.percentPerWeek);
+    if (magnitude < 0.5) return "";
+    return magnitude <= 1 ? "positive" : "caution";
+  };
+  const unitLabel = rateUnit === "kg" ? `${weightUnit}/wk` : "%/wk";
+  return (
+    <section className="rate-chart" aria-label="Weekly rate of change trend">
+      <header>
+        <h2>Rate of change</h2>
+        <span>{spanCaption(span)}</span>
+      </header>
+      <svg
+        viewBox={`0 0 360 ${plotBottom + 12}`}
+        role="img"
+        aria-label={`Weekly rate of change in ${unitLabel} over time`}
+      >
+        {rateUnit === "percent" && maxAbs >= 0.5 && (
+          <>
+            <line className="rate-guideline" x1={plotLeft} x2={plotRight} y1={yAt(-0.5)} y2={yAt(-0.5)} />
+            {maxAbs >= 1 && (
+              <line className="rate-guideline" x1={plotLeft} x2={plotRight} y1={yAt(-1)} y2={yAt(-1)} />
+            )}
+          </>
+        )}
+        <line className="rate-zero" x1={plotLeft} x2={plotRight} y1={midY} y2={midY} />
+        {recent.map((point, index) => {
+          const value = valueOf(point);
+          const y = yAt(value);
+          const top = Math.min(y, midY);
+          const height = Math.max(Math.abs(y - midY), 1.5);
+          const selectedHere = selected?.date === point.date;
+          return (
+            <rect
+              key={point.date}
+              className={`rate-bar ${toneFor(point)}${selectedHere ? " selected" : ""}`}
+              x={xAt(index) - barWidth / 2}
+              y={top}
+              width={barWidth}
+              height={height}
+              role="button"
+              tabIndex={0}
+              aria-label={`${format(new Date(`${point.date}T12:00:00`), "d MMMM yyyy")}: ${value > 0 ? "+" : ""}${value.toFixed(2)} ${unitLabel}`}
+              aria-pressed={selectedHere}
+              onClick={() => setSelectedDate(point.date)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setSelectedDate(point.date);
+                }
+              }}
+            />
+          );
+        })}
+      </svg>
+      {selected && (
+        <div className="rate-chart-readout" role="status" aria-live="polite">
+          <strong>{format(new Date(`${selected.date}T12:00:00`), "EEE, d MMM yyyy")}</strong>
+          <span>
+            {valueOf(selected) > 0 ? "+" : ""}
+            {valueOf(selected).toFixed(2)} {unitLabel}
+          </span>
+        </div>
+      )}
     </section>
   );
 }

@@ -1,5 +1,5 @@
 import { describe,expect,it } from "vitest";
-import { aggregateWeightsByDay, displayWeight, weeklyWeightChange, weightChange, weightInputToKg, withSevenDayAverage } from "./body";
+import { aggregateWeightsByDay, displayWeight, weeklyRateSeries, weeklyWeightChange, weightChange, weightInputToKg, withSevenDayAverage } from "./body";
 import type { WeightEntry } from "./types";
 const weight=(date:string,weightKg:number):WeightEntry=>({id:date,date,weightKg});
 describe("body weight calculations",()=>{it("calculates a trailing seven-calendar-day average",()=>{const points=withSevenDayAverage([weight("2026-07-01",80),weight("2026-07-05",78),weight("2026-07-08",76)]);expect(points[2]?.rollingAverageKg).toBe(77);expect(points[1]?.rollingAverageKg).toBe(79)});it("calculates overall change independent of input order",()=>expect(weightChange([weight("2026-07-08",78),weight("2026-07-01",80)])).toBe(-2))});
@@ -46,5 +46,33 @@ describe("weekly weight change", () => {
 
   it("returns undefined with fewer than two data points", () => {
     expect(weeklyWeightChange([weight("2026-07-01", 80)])).toBeUndefined();
+  });
+
+  it("keeps the weekly kg rate the same across spans on a perfectly linear trend", () => {
+    const linear = Array.from({ length: 30 }, (_, day) =>
+      weight(`2026-07-${String(day + 1).padStart(2, "0")}`, 90 - day),
+    );
+    expect(weeklyWeightChange(linear, 7)?.kgPerWeek).toBeCloseTo(-7, 8);
+    expect(weeklyWeightChange(linear, 14)?.kgPerWeek).toBeCloseTo(-7, 8);
+  });
+
+  it("reaches back to the first entry once the span exceeds the available history", () => {
+    const readings = Array.from({ length: 14 }, (_, day) =>
+      weight(`2026-07-${String(day + 1).padStart(2, "0")}`, 80 - day),
+    );
+    const rate = weeklyWeightChange(readings, "all");
+    expect(rate?.kgPerWeek).toBeCloseTo(-5.3846, 4);
+    expect(rate?.percentPerWeek).toBeCloseTo(-7.6923, 4);
+  });
+
+  it("produces a rate series consistent with the latest single-point rate", () => {
+    const readings = Array.from({ length: 14 }, (_, day) =>
+      weight(`2026-07-${String(day + 1).padStart(2, "0")}`, 80 - day),
+    );
+    const series = weeklyRateSeries(readings);
+    expect(series.length).toBeGreaterThan(0);
+    expect(series.length).toBeLessThan(14);
+    expect(series.at(-1)?.date).toBe("2026-07-14");
+    expect(series.at(-1)?.kgPerWeek).toBeCloseTo(weeklyWeightChange(readings)!.kgPerWeek, 8);
   });
 });
